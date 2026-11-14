@@ -1,0 +1,8 @@
+{
+  "meta": {
+    "title": "ARIS Pipelines",
+    "description": "Monitor every running ARIS pipeline in one panel: phase, gates, reviews and next step, with whitelisted actions."
+  },
+  "title": "Dsh_Aris",
+  "description": "Monitor every running ARIS pipeline: phase, gates, reviews, cost and next step; start any folder, manage Kimi handoff and local scheduled collection."
+}

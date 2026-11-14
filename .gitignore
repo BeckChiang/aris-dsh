@@ -1,0 +1,27 @@
+# 白名单式忽略：默认全部忽略，只放行 ARIS 发布内容。
+# 这样 work/、tmp/、archive/、.aris-run、costs.jsonl、aris-projects.json 永远进不来。
+*
+!*/
+
+# ---- 放行目录树 ----
+!.dsh/skills/aris/**
+!bin/**
+!plugins/dsh-aris/**
+!docs/**
+!README.md
+!LICENSE
+!MANIFEST.json
+!.gitignore
+
+# ---- 再排除（后写的规则覆盖先写的）----
+/scripts/
+
+.dsh/skills/aris/tests/
+.dsh/skills/aris/**/node_modules/
+.dsh/skills/aris/**/*.log
+node_modules/
+**/costs.jsonl
+**/runtime.json
+**/.aris-run/
+**/*.log
+.DS_Store

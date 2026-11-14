@@ -1,0 +1,3396 @@
+{
+  "repo": "BeckChiang/aris-dsh",
+  "generated_at": "2026-11-14T13:15:35.366Z",
+  "note": "由 scripts/sync.mjs 从本机 DSH 工作区单向生成；本文件为发布快照标识，请勿手改。",
+  "rules_version": 1,
+  "counts": {
+    "files": 675,
+    "bytes": 12877898
+  },
+  "excluded": [
+    "tests",
+    "node_modules",
+    ".git",
+    ".aris-run",
+    "costs.jsonl",
+    "runtime.json",
+    "*.log"
+  ],
+  "files": [
+    {
+      "p": ".dsh/skills/aris/aris-monitor/assets/screenshot.png",
+      "sha256": "45f9dae192eeb422",
+      "bytes": 95117
+    },
+    {
+      "p": ".dsh/skills/aris/aris-monitor/focus-tty.sh",
+      "sha256": "20b7c520744ebf9a",
+      "bytes": 6072
+    },
+    {
+      "p": ".dsh/skills/aris/aris-monitor/focus.py",
+      "sha256": "78054ed20d10313d",
+      "bytes": 4236
+    },
+    {
+      "p": ".dsh/skills/aris/aris-monitor/README.md",
+      "sha256": "7c3b6fab70acb34b",
+      "bytes": 8236
+    },
+    {
+      "p": ".dsh/skills/aris/aris-monitor/run.sh",
+      "sha256": "e47ba05bf467f20e",
+      "bytes": 1842
+    },
+    {
+      "p": ".dsh/skills/aris/aris-monitor/scanner.py",
+      "sha256": "139230cd5285e40f",
+      "bytes": 18379
+    },
+    {
+      "p": ".dsh/skills/aris/aris-monitor/ticker.py",
+      "sha256": "e2a5c36624ad9963",
+      "bytes": 2530
+    },
+    {
+      "p": ".dsh/skills/aris/aris-monitor/widget.py",
+      "sha256": "6abf1b52514a4baa",
+      "bytes": 15656
+    },
+    {
+      "p": ".dsh/skills/aris/DSH_PORT.md",
+      "sha256": "99bdbe3f206bacc9",
+      "bytes": 30761
+    },
+    {
+      "p": ".dsh/skills/aris/LICENSE",
+      "sha256": "e30cf5dd5f49b4f9",
+      "bytes": 1067
+    },
+    {
+      "p": ".dsh/skills/aris/mcp-servers/antigravity-exec/aris-antigravity-review.md",
+      "sha256": "620f5f2547e4bf69",
+      "bytes": 797
+    },
+    {
+      "p": ".dsh/skills/aris/mcp-servers/antigravity-exec/README.md",
+      "sha256": "4e75dc336e0aaa76",
+      "bytes": 5209
+    },
+    {
+      "p": ".dsh/skills/aris/mcp-servers/antigravity-exec/server.py",
+      "sha256": "cd9a52462461a010",
+      "bytes": 23235
+    },
+    {
+      "p": ".dsh/skills/aris/mcp-servers/claude-review/README.md",
+      "sha256": "100dd10c85e2ce9e",
+      "bytes": 6944
+    },
+    {
+      "p": ".dsh/skills/aris/mcp-servers/claude-review/run_with_claude_aws.sh",
+      "sha256": "ea5014e1e127e3e6",
+      "bytes": 1613
+    },
+    {
+      "p": ".dsh/skills/aris/mcp-servers/claude-review/server.py",
+      "sha256": "0d65a638ad314ee9",
+      "bytes": 30854
+    },
+    {
+      "p": ".dsh/skills/aris/mcp-servers/codex-exec/README.md",
+      "sha256": "ca22b72805e05764",
+      "bytes": 3071
+    },
+    {
+      "p": ".dsh/skills/aris/mcp-servers/codex-exec/server.py",
+      "sha256": "12be80d295bf52ab",
+      "bytes": 19635
+    },
+    {
+      "p": ".dsh/skills/aris/mcp-servers/codex-image2/README.md",
+      "sha256": "0eb95222fc07c9b6",
+      "bytes": 2096
+    },
+    {
+      "p": ".dsh/skills/aris/mcp-servers/codex-image2/server.py",
+      "sha256": "74d6e72d6e7d686f",
+      "bytes": 32608
+    },
+    {
+      "p": ".dsh/skills/aris/mcp-servers/feishu-bridge/requirements.txt",
+      "sha256": "2a2c17c400824a8b",
+      "bytes": 20
+    },
+    {
+      "p": ".dsh/skills/aris/mcp-servers/feishu-bridge/server.py",
+      "sha256": "d8f1be057bfc3341",
+      "bytes": 7722
+    },
+    {
+      "p": ".dsh/skills/aris/mcp-servers/gemini-review/README.md",
+      "sha256": "15a120f27b597e6a",
+      "bytes": 11256
+    },
+    {
+      "p": ".dsh/skills/aris/mcp-servers/gemini-review/server.py",
+      "sha256": "746c24142b32b179",
+      "bytes": 68489
+    },
+    {
+      "p": ".dsh/skills/aris/mcp-servers/grok-exec/README.md",
+      "sha256": "f67500dddd491ed5",
+      "bytes": 7683
+    },
+    {
+      "p": ".dsh/skills/aris/mcp-servers/grok-exec/server.py",
+      "sha256": "21025e5af525a50a",
+      "bytes": 23665
+    },
+    {
+      "p": ".dsh/skills/aris/mcp-servers/llm-chat/requirements.txt",
+      "sha256": "1c9327746b9637a2",
+      "bytes": 17
+    },
+    {
+      "p": ".dsh/skills/aris/mcp-servers/llm-chat/server.py",
+      "sha256": "81fffde59f358db5",
+      "bytes": 28711
+    },
+    {
+      "p": ".dsh/skills/aris/mcp-servers/manual-review/README.md",
+      "sha256": "be414c44d7ba96e3",
+      "bytes": 5267
+    },
+    {
+      "p": ".dsh/skills/aris/mcp-servers/manual-review/server.py",
+      "sha256": "e93ce7d92196d43c",
+      "bytes": 35380
+    },
+    {
+      "p": ".dsh/skills/aris/mcp-servers/manual-review/ui.html",
+      "sha256": "4c1c0dd2052cd29c",
+      "bytes": 13898
+    },
+    {
+      "p": ".dsh/skills/aris/mcp-servers/minimax-chat/requirements.txt",
+      "sha256": "1c9327746b9637a2",
+      "bytes": 17
+    },
+    {
+      "p": ".dsh/skills/aris/mcp-servers/minimax-chat/server.py",
+      "sha256": "0d07916fea4a33a7",
+      "bytes": 13394
+    },
+    {
+      "p": ".dsh/skills/aris/mcp-servers/model-worker/aris-model-worker.md",
+      "sha256": "dc07646e2345979d",
+      "bytes": 1432
+    },
+    {
+      "p": ".dsh/skills/aris/mcp-servers/model-worker/client.py",
+      "sha256": "b5f63cd4da2f8ee6",
+      "bytes": 6266
+    },
+    {
+      "p": ".dsh/skills/aris/mcp-servers/model-worker/README.md",
+      "sha256": "c6893073621dc8e0",
+      "bytes": 7345
+    },
+    {
+      "p": ".dsh/skills/aris/mcp-servers/model-worker/server.py",
+      "sha256": "e2e66716d2902b21",
+      "bytes": 26821
+    },
+    {
+      "p": ".dsh/skills/aris/MCP_REPLACEMENTS.md",
+      "sha256": "a3dd8f85f85e5b07",
+      "bytes": 8650
+    },
+    {
+      "p": ".dsh/skills/aris/references/agents/aris-fanout-leaf.md",
+      "sha256": "f45c1e1eb4f077e2",
+      "bytes": 1467
+    },
+    {
+      "p": ".dsh/skills/aris/references/commands/setup.md",
+      "sha256": "2fd6dc166a948a33",
+      "bytes": 2953
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/ALI_CODING_PLAN_GUIDE.md",
+      "sha256": "47d81fe25d048fe5",
+      "bytes": 13973
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/ANTIGRAVITY_ADAPTATION.md",
+      "sha256": "7b9b73e5f6e49502",
+      "bytes": 16722
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/ANTIGRAVITY_ADAPTATION_CN.md",
+      "sha256": "a183b64870bbe5c3",
+      "bytes": 14163
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/ARIS-Code-README_CN.md",
+      "sha256": "2bce9d278bf19a6b",
+      "bytes": 415
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/ARIS-Code-README_EN.md",
+      "sha256": "00cf684cc3f002c0",
+      "bytes": 401
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/ARIS_INTRO.md",
+      "sha256": "0add1835c7dcd26e",
+      "bytes": 34063
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/ARIS_INTRO.review.json",
+      "sha256": "938d79b1f6828593",
+      "bytes": 3545
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/CODEX_CLAUDE_REVIEW_GUIDE.md",
+      "sha256": "ac72fff6e00eab7d",
+      "bytes": 3388
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/CODEX_CLAUDE_REVIEW_GUIDE_CN.md",
+      "sha256": "2af2f2a08a9410d0",
+      "bytes": 3336
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/CODEX_GEMINI_REVIEW_GUIDE.md",
+      "sha256": "6beb5f44f34859f7",
+      "bytes": 10068
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/CODEX_GEMINI_REVIEW_GUIDE_CN.md",
+      "sha256": "e502eaaad792e29b",
+      "bytes": 9659
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/CODEX_POLICY_AUDIT.md",
+      "sha256": "b66f57c9168c69db",
+      "bytes": 3249
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/COPILOT_CLI_ADAPTATION.md",
+      "sha256": "367caba66f9d1b8e",
+      "bytes": 14312
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/CURSOR_ADAPTATION.md",
+      "sha256": "9055d7ae2ec6b45f",
+      "bytes": 12161
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/CUSTOMIZATION.md",
+      "sha256": "6bb4cfe2c50a0f9b",
+      "bytes": 9215
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/CUSTOMIZATION_CN.md",
+      "sha256": "2deb35a4be29ab87",
+      "bytes": 8578
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/GPU_SETUP.md",
+      "sha256": "457d59650b09e208",
+      "bytes": 2846
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/GPU_SETUP_CN.md",
+      "sha256": "f0328a4a2919bfa5",
+      "bytes": 2713
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/integrations/FEISHU.md",
+      "sha256": "f0725ee9d788eb0d",
+      "bytes": 9205
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/integrations/FEISHU_CN.md",
+      "sha256": "c8b88abd24f950e6",
+      "bytes": 9007
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/integrations/OBSIDIAN.md",
+      "sha256": "f2603b51b2d1a76c",
+      "bytes": 2958
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/integrations/OBSIDIAN_CN.md",
+      "sha256": "4c9d776e0352108e",
+      "bytes": 2873
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/integrations/VAST_GPU_GUIDE.md",
+      "sha256": "3d30582549a72cf2",
+      "bytes": 4679
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/integrations/VAST_GPU_GUIDE_CN.md",
+      "sha256": "b75a35ca889caa7b",
+      "bytes": 4512
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/integrations/ZOTERO.md",
+      "sha256": "e9014dc6cb15e008",
+      "bytes": 2831
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/integrations/ZOTERO_CN.md",
+      "sha256": "e9e5f0df5d1dac1e",
+      "bytes": 2694
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/LLM_API_MIX_MATCH_GUIDE.md",
+      "sha256": "edd805cfa7ab2cbc",
+      "bytes": 7801
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/MANUAL_REVIEW_GUIDE.md",
+      "sha256": "baa72701a5df96c5",
+      "bytes": 6583
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/MANUAL_REVIEW_GUIDE_CN.md",
+      "sha256": "74b3192181e3351e",
+      "bytes": 6084
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/MiniMax-GLM-Configuration.md",
+      "sha256": "8548e15d73b07815",
+      "bytes": 6942
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/MINIMAX_MCP_GUIDE.md",
+      "sha256": "46e46f6bad3a1e02",
+      "bytes": 6271
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/MODELSCOPE_GUIDE.md",
+      "sha256": "4608115e955be8c6",
+      "bytes": 12403
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/MODEL_COMBINATIONS.md",
+      "sha256": "68698e5967a21e18",
+      "bytes": 8125
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/MODEL_COMBINATIONS_CN.md",
+      "sha256": "bf30c3e4c298360b",
+      "bytes": 8286
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/NARRATIVE_REPORT_EXAMPLE.md",
+      "sha256": "e3cdd66c75d6c037",
+      "bytes": 7665
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/OPENCLAW_ADAPTATION.md",
+      "sha256": "a9c60c6a60aabf20",
+      "bytes": 2212
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/OPENROUTER_GUIDE.md",
+      "sha256": "0d5cf5ac8ece8fb8",
+      "bytes": 10598
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/OPENROUTER_GUIDE_CN.md",
+      "sha256": "e5e30a1a454cff8b",
+      "bytes": 10359
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/PROJECT_FILES_GUIDE.md",
+      "sha256": "1029bc47aeca117f",
+      "bytes": 8900
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/PROJECT_FILES_GUIDE_CN.md",
+      "sha256": "95350f17c1bf535f",
+      "bytes": 8404
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/RESUBMIT_AND_TALK.md",
+      "sha256": "c2329e069ad52b8a",
+      "bytes": 8081
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/RESUBMIT_AND_TALK_CN.md",
+      "sha256": "363db52038d379de",
+      "bytes": 7987
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/SESSION_RECOVERY_GUIDE.md",
+      "sha256": "e80ebc13d0a230bb",
+      "bytes": 20871
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/SESSION_RECOVERY_GUIDE_CN.md",
+      "sha256": "b48f70048a30fe15",
+      "bytes": 19466
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/SKILLS_CATALOG.md",
+      "sha256": "afef5aae729cc094",
+      "bytes": 22217
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/TRAE_ARIS_RUNBOOK_CN.md",
+      "sha256": "e2b90f56b05f857e",
+      "bytes": 11670
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/TRAE_ARIS_RUNBOOK_EN.md",
+      "sha256": "36366212038f4010",
+      "bytes": 11634
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/3d_generation_tutorial.md",
+      "sha256": "beab28036da8f287",
+      "bytes": 64843
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/3d_generation_tutorial.review.json",
+      "sha256": "c79cb0fa5764e9b4",
+      "bytes": 1663
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/3d_generation_tutorial_en.md",
+      "sha256": "9caec9665d59cc27",
+      "bytes": 70465
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/agentic_rl_tutorial.md",
+      "sha256": "d3d476658bea0760",
+      "bytes": 77810
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/agentic_rl_tutorial.review.json",
+      "sha256": "b2422f2a80514928",
+      "bytes": 5878
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/agentic_rl_tutorial_en.md",
+      "sha256": "9dd920e9292be2a5",
+      "bytes": 82844
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/agent_foundations_tutorial.md",
+      "sha256": "a329ddea9be664b9",
+      "bytes": 74041
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/agent_foundations_tutorial.review.json",
+      "sha256": "0b688cdfc83f1882",
+      "bytes": 10832
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/agent_foundations_tutorial_en.md",
+      "sha256": "1b1053abea299e0d",
+      "bytes": 79511
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/attention_tutorial.md",
+      "sha256": "8d8d5146c1a9a924",
+      "bytes": 30353
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/attention_tutorial.review.json",
+      "sha256": "15e1d9ff9ce2e276",
+      "bytes": 1931
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/attention_tutorial_en.md",
+      "sha256": "ecb6fe924cee8db5",
+      "bytes": 32810
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/diffusion_distillation_tutorial.md",
+      "sha256": "cdf8cbf0098fd69e",
+      "bytes": 86225
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/diffusion_distillation_tutorial.review.json",
+      "sha256": "2d8365327bb9130c",
+      "bytes": 8437
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/diffusion_distillation_tutorial_en.md",
+      "sha256": "cceb6c61f1f5be01",
+      "bytes": 90430
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/diffusion_foundations_tutorial.md",
+      "sha256": "95c1efc6f9296783",
+      "bytes": 77130
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/diffusion_foundations_tutorial.review.json",
+      "sha256": "3c70f0c7bc7e4d78",
+      "bytes": 4352
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/diffusion_foundations_tutorial_en.md",
+      "sha256": "5f3b3e8403e8abdc",
+      "bytes": 81245
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/diffusion_post_training_tutorial.md",
+      "sha256": "95b47c84420904cb",
+      "bytes": 77060
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/diffusion_post_training_tutorial.review.json",
+      "sha256": "5af1efdc5779f814",
+      "bytes": 4062
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/diffusion_post_training_tutorial_en.md",
+      "sha256": "6143ed98abc28b9f",
+      "bytes": 81943
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/distributed_training_tutorial.md",
+      "sha256": "86087779b70e3bca",
+      "bytes": 74991
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/distributed_training_tutorial.review.json",
+      "sha256": "1487e32d3e07b7a2",
+      "bytes": 5623
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/distributed_training_tutorial_en.md",
+      "sha256": "9ee6b9a3603bcd08",
+      "bytes": 78147
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/flow_matching_tutorial.md",
+      "sha256": "ab4358901d204fec",
+      "bytes": 24162
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/flow_matching_tutorial.review.json",
+      "sha256": "8416b67538df0858",
+      "bytes": 1485
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/flow_matching_tutorial_en.md",
+      "sha256": "90243d531e3f172d",
+      "bytes": 25348
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/image_generation_systems_tutorial.md",
+      "sha256": "76785ba96660960a",
+      "bytes": 72209
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/image_generation_systems_tutorial.review.json",
+      "sha256": "8eb2e92e4926fe9a",
+      "bytes": 2524
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/image_generation_systems_tutorial_en.md",
+      "sha256": "ef1c753cbe28e852",
+      "bytes": 76946
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/kl_divergence_rlhf_tutorial.md",
+      "sha256": "f0b8b5e62023c407",
+      "bytes": 95454
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/kl_divergence_rlhf_tutorial.review.json",
+      "sha256": "d51af08a161ab373",
+      "bytes": 3970
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/kl_divergence_rlhf_tutorial_en.md",
+      "sha256": "4477782e0f503450",
+      "bytes": 101263
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/kv_cache_speculative_decoding_tutorial.md",
+      "sha256": "688b47c5bdc93b69",
+      "bytes": 68472
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/kv_cache_speculative_decoding_tutorial.review.json",
+      "sha256": "5ab2db5412c00128",
+      "bytes": 5638
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/kv_cache_speculative_decoding_tutorial_en.md",
+      "sha256": "3357e2dd8dc0b865",
+      "bytes": 71658
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/llm_opd_tutorial.md",
+      "sha256": "621b0792bede0b06",
+      "bytes": 89118
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/llm_opd_tutorial.review.json",
+      "sha256": "5b293c23c7498bb7",
+      "bytes": 6700
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/llm_opd_tutorial_en.md",
+      "sha256": "70c85782439f0b5a",
+      "bytes": 95550
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/long_context_rope_yarn_mla_tutorial.md",
+      "sha256": "cf9958df2aff90f9",
+      "bytes": 65082
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/long_context_rope_yarn_mla_tutorial.review.json",
+      "sha256": "3bfa2d82494168a7",
+      "bytes": 4908
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/long_context_rope_yarn_mla_tutorial_en.md",
+      "sha256": "d8ebcc89a3ac6a7b",
+      "bytes": 73378
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/moe_tutorial.md",
+      "sha256": "e860589270ed4479",
+      "bytes": 57965
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/moe_tutorial.review.json",
+      "sha256": "86023d282e4b7f53",
+      "bytes": 3142
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/moe_tutorial_en.md",
+      "sha256": "c0214eed71807028",
+      "bytes": 63245
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/multi_agent_long_horizon_tutorial.md",
+      "sha256": "b0be93d29409b81e",
+      "bytes": 90502
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/multi_agent_long_horizon_tutorial.review.json",
+      "sha256": "0e21e83ed00dc683",
+      "bytes": 4265
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/multi_agent_long_horizon_tutorial_en.md",
+      "sha256": "8ac31a10efb058f7",
+      "bytes": 96489
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/quantization_tutorial.md",
+      "sha256": "f04948e0f203c297",
+      "bytes": 63694
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/quantization_tutorial.review.json",
+      "sha256": "c88b0cfbdb752f44",
+      "bytes": 2440
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/quantization_tutorial_en.md",
+      "sha256": "a4b453729283fdc4",
+      "bytes": 66292
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/README.md",
+      "sha256": "94148c359e49f505",
+      "bytes": 8735
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/reasoning_models_tutorial.md",
+      "sha256": "549e2f7e241c94ec",
+      "bytes": 61999
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/reasoning_models_tutorial.review.json",
+      "sha256": "ec7638c9b5696c19",
+      "bytes": 4235
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/reasoning_models_tutorial_en.md",
+      "sha256": "0aefca37b314b59a",
+      "bytes": 65610
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/rlhf_dpo_grpo_ppo_tutorial.md",
+      "sha256": "67ea410d68e25041",
+      "bytes": 60384
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/rlhf_dpo_grpo_ppo_tutorial.review.json",
+      "sha256": "66f9961a456933b2",
+      "bytes": 3667
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/rlhf_dpo_grpo_ppo_tutorial_en.md",
+      "sha256": "0740c1296ea5c290",
+      "bytes": 64448
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/self_evolving_agents_tutorial.md",
+      "sha256": "b863a1d3abfdb351",
+      "bytes": 72513
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/self_evolving_agents_tutorial.review.json",
+      "sha256": "9b59e3c131882f60",
+      "bytes": 4726
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/self_evolving_agents_tutorial_en.md",
+      "sha256": "65f5baf62206b250",
+      "bytes": 76661
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/vae_vqvae_vqgan_tutorial.md",
+      "sha256": "826ba28b7bb7ff38",
+      "bytes": 63092
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/vae_vqvae_vqgan_tutorial.review.json",
+      "sha256": "a36433c93f166b13",
+      "bytes": 4352
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/vae_vqvae_vqgan_tutorial_en.md",
+      "sha256": "e6f6353f05d0ca80",
+      "bytes": 66885
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/video_generation_tutorial.md",
+      "sha256": "4aaa64ff3f54473d",
+      "bytes": 65178
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/video_generation_tutorial.review.json",
+      "sha256": "de25510899b68b44",
+      "bytes": 4640
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/video_generation_tutorial_en.md",
+      "sha256": "4fa0ce035daf77d9",
+      "bytes": 71688
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/vlm_multimodal_tutorial.md",
+      "sha256": "f9cc9510bdd53549",
+      "bytes": 75430
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/vlm_multimodal_tutorial.review.json",
+      "sha256": "0ff93eeed034c9fb",
+      "bytes": 4705
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/tutorials/vlm_multimodal_tutorial_en.md",
+      "sha256": "de321e4d3dec5699",
+      "bytes": 81025
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/WATCHDOG_GUIDE.md",
+      "sha256": "84638cfe4f6cd9b6",
+      "bytes": 7432
+    },
+    {
+      "p": ".dsh/skills/aris/references/docs/WATCHDOG_GUIDE_CN.md",
+      "sha256": "98e2384bda65ea22",
+      "bytes": 7220
+    },
+    {
+      "p": ".dsh/skills/aris/references/dsh-lit-override.md",
+      "sha256": "67f66c8576196a37",
+      "bytes": 5932
+    },
+    {
+      "p": ".dsh/skills/aris/references/dsh-model-override.md",
+      "sha256": "6be0c16bd06d8f79",
+      "bytes": 2679
+    },
+    {
+      "p": ".dsh/skills/aris/references/INDEX.md",
+      "sha256": "97bc2ad2bb75bbac",
+      "bytes": 86570
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/ablation-planner/SKILL.md",
+      "sha256": "2eadd98ba98c5fde",
+      "bytes": 5534
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/alphaxiv/SKILL.md",
+      "sha256": "610d23ddd39d577d",
+      "bytes": 9351
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/analyze-results/SKILL.md",
+      "sha256": "2b97b8ae1a279ac8",
+      "bytes": 1660
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/arxiv/SKILL.md",
+      "sha256": "cd4f24a28667c8bd",
+      "bytes": 9523
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/auto-paper-improvement-loop/SKILL.md",
+      "sha256": "5c066b0c8d3dbc58",
+      "bytes": 44130
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/auto-review-loop/SKILL.md",
+      "sha256": "ba6784598688fd4f",
+      "bytes": 77425
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/auto-review-loop-llm/SKILL.md",
+      "sha256": "a5e8a4b4db68d0fd",
+      "bytes": 9527
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/auto-review-loop-minimax/SKILL.md",
+      "sha256": "70f4952522747030",
+      "bytes": 13037
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/citation-audit/SKILL.md",
+      "sha256": "1aee22910ec01ada",
+      "bytes": 32772
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/citation-crosscheck/scripts/cx_verify.py",
+      "sha256": "b15462f33db4f5a4",
+      "bytes": 86079
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/citation-crosscheck/SKILL.md",
+      "sha256": "1529e05ea5de3109",
+      "bytes": 37162
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/claims-drafting/SKILL.md",
+      "sha256": "dcbb94cc4ef83492",
+      "bytes": 11900
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/comm-lit-review/SKILL.md",
+      "sha256": "432b4f8b631f07ce",
+      "bytes": 9203
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/deepxiv/SKILL.md",
+      "sha256": "11032b81e5933897",
+      "bytes": 8994
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/dse-loop/SKILL.md",
+      "sha256": "ae8e147011f7c1a6",
+      "bytes": 14175
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/embodiment-description/SKILL.md",
+      "sha256": "8833b45694350775",
+      "bytes": 6732
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/exa-search/SKILL.md",
+      "sha256": "a3bf1387c21fde63",
+      "bytes": 8865
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/experiment-audit/SKILL.md",
+      "sha256": "0e5ff57bf44fc046",
+      "bytes": 14428
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/experiment-bridge/SKILL.md",
+      "sha256": "1900c62d2a0c92b4",
+      "bytes": 20316
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/experiment-plan/SKILL.md",
+      "sha256": "c5b53692ff95b0b5",
+      "bytes": 9728
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/experiment-queue/scripts/build_manifest.py",
+      "sha256": "cdf761e85ec1fdc3",
+      "bytes": 4702
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/experiment-queue/scripts/queue_manager.py",
+      "sha256": "153d342d4dfd298b",
+      "bytes": 15547
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/experiment-queue/SKILL.md",
+      "sha256": "ea77a1ecd676d64f",
+      "bytes": 20601
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/feishu-notify/SKILL.md",
+      "sha256": "1a6c2e7a92b4f10c",
+      "bytes": 6172
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/figure-description/SKILL.md",
+      "sha256": "4c69bc650a67d168",
+      "bytes": 5000
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/figure-spec/scripts/figure_renderer.py",
+      "sha256": "51d076ef3ec95e52",
+      "bytes": 30671
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/figure-spec/SKILL.md",
+      "sha256": "af289f126b0015b6",
+      "bytes": 12976
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/firecrawl-search/SKILL.md",
+      "sha256": "9fca6813067b8992",
+      "bytes": 11207
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/formula-derivation/SKILL.md",
+      "sha256": "c428e321dd2df66a",
+      "bytes": 9550
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/gemini-search/SKILL.md",
+      "sha256": "c68da27b420c87e2",
+      "bytes": 9683
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/grant-proposal/SKILL.md",
+      "sha256": "47710cc8b0a2aae8",
+      "bytes": 37426
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/idea-creator/SKILL.md",
+      "sha256": "28eef3184d3027e0",
+      "bytes": 36337
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/idea-discovery/SKILL.md",
+      "sha256": "5a11398e7e77855c",
+      "bytes": 29343
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/idea-discovery-robot/SKILL.md",
+      "sha256": "0534434f486c03ae",
+      "bytes": 16368
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/integrity-forensics/SKILL.md",
+      "sha256": "f3e9287c8a0a7224",
+      "bytes": 17850
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/interview-cheatsheet/SKILL.md",
+      "sha256": "424c1fcaba4cb1c1",
+      "bytes": 15460
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/invention-structuring/SKILL.md",
+      "sha256": "14e6726bed486e00",
+      "bytes": 8511
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/jurisdiction-format/SKILL.md",
+      "sha256": "7683f58c4ad6465b",
+      "bytes": 6816
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/keenable-search/SKILL.md",
+      "sha256": "98f9da7eaa89413b",
+      "bytes": 6375
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/kill-argument/SKILL.md",
+      "sha256": "48e9f60f33e6a2ca",
+      "bytes": 26724
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/lean-formalize/references/adversarial-review.md",
+      "sha256": "258e718bb63b96a8",
+      "bytes": 14165
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/lean-formalize/references/lean-working-loop.md",
+      "sha256": "33368e31eb1dc748",
+      "bytes": 10625
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/lean-formalize/references/verification-and-handoff.md",
+      "sha256": "13c498361096ebea",
+      "bytes": 6332
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/lean-formalize/SKILL.md",
+      "sha256": "cd6f66916c5be6ea",
+      "bytes": 23401
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/mermaid-diagram/SKILL.md",
+      "sha256": "8f42b38a1deaa7b9",
+      "bytes": 16323
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/meta-apply/SKILL.md",
+      "sha256": "c6f35c369e5fa44d",
+      "bytes": 9742
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/meta-optimize/SKILL.md",
+      "sha256": "4254476200f31953",
+      "bytes": 25973
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/monitor-experiment/SKILL.md",
+      "sha256": "c0f1b85c31124e71",
+      "bytes": 5187
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/novelty-check/SKILL.md",
+      "sha256": "90f572fe872c18da",
+      "bytes": 8927
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/openalex/SKILL.md",
+      "sha256": "b391577c8f695904",
+      "bytes": 10213
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/overleaf-sync/SKILL.md",
+      "sha256": "0f0e31c57d747c2b",
+      "bytes": 11342
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-claim-audit/SKILL.md",
+      "sha256": "fef5ea3f9f27d6b3",
+      "bytes": 15960
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-compile/SKILL.md",
+      "sha256": "d4b2a9ff912dfe64",
+      "bytes": 10335
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-figure/SKILL.md",
+      "sha256": "b313651877d8bd83",
+      "bytes": 15382
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-illustration/SKILL.md",
+      "sha256": "f57ba67cd0961a5b",
+      "bytes": 34367
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-illustration-image2/scripts/paper_illustration_image2.py",
+      "sha256": "aa67846acdaf623e",
+      "bytes": 8999
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-illustration-image2/SKILL.md",
+      "sha256": "560721f7602a1aad",
+      "bytes": 20943
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-plan/SKILL.md",
+      "sha256": "aa6a9a61f390c1f0",
+      "bytes": 23045
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-poster/SKILL.md",
+      "sha256": "742bc5696fd83899",
+      "bytes": 839
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-poster-html/DESIGN_FINAL.md",
+      "sha256": "1e1931569efe301a",
+      "bytes": 9948
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-poster-html/IMPLEMENTATION_CONVENTIONS.md",
+      "sha256": "2fbfbc85f57f8c42",
+      "bytes": 9098
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-poster-html/LICENSES/posterly-MIT.txt",
+      "sha256": "0f097b552f2be95d",
+      "bytes": 1069
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-poster-html/NOTICE.md",
+      "sha256": "058090d55f2c7d14",
+      "bytes": 3288
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-poster-html/scripts/asset_check.py",
+      "sha256": "e3fda7aaa906df0e",
+      "bytes": 37701
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-poster-html/scripts/extract_pdf_figures.py",
+      "sha256": "ad1af0b27b34d812",
+      "bytes": 26667
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-poster-html/scripts/poster_check.py",
+      "sha256": "72400079d1af3c8a",
+      "bytes": 10373
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-poster-html/scripts/preprocess_figures.py",
+      "sha256": "fd458dfa6a009065",
+      "bytes": 9543
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-poster-html/scripts/render_preview.py",
+      "sha256": "7b98ce19c7b269e7",
+      "bytes": 7886
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-poster-html/scripts/run_gates.py",
+      "sha256": "785380f65b3a8f48",
+      "bytes": 21037
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-poster-html/scripts/style_check.py",
+      "sha256": "dea055347107715c",
+      "bytes": 54505
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-poster-html/scripts/_posterly/canvas.py",
+      "sha256": "11503d98ebc2b817",
+      "bytes": 7377
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-poster-html/scripts/_posterly/measure.py",
+      "sha256": "ffaab446329621f5",
+      "bytes": 24692
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-poster-html/scripts/_posterly/polish.py",
+      "sha256": "d401dbf27ee198a3",
+      "bytes": 21014
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-poster-html/scripts/_posterly/preflight.py",
+      "sha256": "ca81022db3d92b9b",
+      "bytes": 21616
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-poster-html/scripts/_posterly/render.py",
+      "sha256": "0ba4bcb874e0648b",
+      "bytes": 8239
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-poster-html/scripts/_posterly/textutil.py",
+      "sha256": "a2b32524cf004810",
+      "bytes": 616
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-poster-html/scripts/_posterly/verify_final.py",
+      "sha256": "bb2c737496d49d50",
+      "bytes": 5683
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-poster-html/scripts/_posterly/__init__.py",
+      "sha256": "e3b0c44298fc1c14",
+      "bytes": 0
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-poster-html/SKILL.md",
+      "sha256": "a6ae75907db62d06",
+      "bytes": 20424
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-poster-html/templates/COMPONENTS.md",
+      "sha256": "382e60604f4bbe9a",
+      "bytes": 31274
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-poster-html/templates/landscape_4col.html",
+      "sha256": "1e72098d28541968",
+      "bytes": 41841
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-poster-html/templates/landscape_hero.html",
+      "sha256": "fd82519f94a25397",
+      "bytes": 44680
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-poster-html/templates/portrait_2col.html",
+      "sha256": "c6031ab64807f04d",
+      "bytes": 40424
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-poster-html/templates/README.md",
+      "sha256": "366923d0de663296",
+      "bytes": 10442
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-poster-html/templates/tokens/acl.json",
+      "sha256": "e9c2bcef6c7433f9",
+      "bytes": 431
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-poster-html/templates/tokens/cvpr.json",
+      "sha256": "921e1c08dabf2f10",
+      "bytes": 432
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-poster-html/templates/tokens/generic.json",
+      "sha256": "229084d6c166d589",
+      "bytes": 435
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-poster-html/templates/tokens/iclr.json",
+      "sha256": "b176829c14d8fbaa",
+      "bytes": 432
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-poster-html/templates/tokens/icml.json",
+      "sha256": "078dbb6101e85795",
+      "bytes": 432
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-poster-html/templates/tokens/neurips.json",
+      "sha256": "f59567e68fa011ea",
+      "bytes": 435
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-slides/SKILL.md",
+      "sha256": "ee30c417498a26f9",
+      "bytes": 25371
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-talk/SKILL.md",
+      "sha256": "6beccd808f4d03ee",
+      "bytes": 22468
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-write/SKILL.md",
+      "sha256": "92d9294c0c24231c",
+      "bytes": 41112
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-write/templates/iclr2026.tex",
+      "sha256": "1e4c20b3c5b74459",
+      "bytes": 1924
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-write/templates/icml2025.tex",
+      "sha256": "d346d4b5b96276a4",
+      "bytes": 2003
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-write/templates/IEEEtran.bst",
+      "sha256": "314f0ece704568fa",
+      "bytes": 57748
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-write/templates/IEEEtran.cls",
+      "sha256": "da751920a317ed31",
+      "bytes": 281957
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-write/templates/ieee_conference.tex",
+      "sha256": "a3dc3a175a7dd151",
+      "bytes": 2124
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-write/templates/ieee_journal.tex",
+      "sha256": "bdff7ff0aa376d8a",
+      "bytes": 2557
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-write/templates/math_commands.tex",
+      "sha256": "3efe4556b2c33b4a",
+      "bytes": 1279
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-write/templates/neurips2025.tex",
+      "sha256": "fef6448048e58b74",
+      "bytes": 1829
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/paper-writing/SKILL.md",
+      "sha256": "55213e9ee0eebf95",
+      "bytes": 54066
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/patent-novelty-check/SKILL.md",
+      "sha256": "e01e7c13b71ecc69",
+      "bytes": 7541
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/patent-pipeline/SKILL.md",
+      "sha256": "e760b14ea799eb70",
+      "bytes": 15652
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/patent-review/SKILL.md",
+      "sha256": "e0faeef35da566cf",
+      "bytes": 8729
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/pixel-art/SKILL.md",
+      "sha256": "e65d74863168eeef",
+      "bytes": 5342
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/prior-art-search/SKILL.md",
+      "sha256": "8793fb26c522de4c",
+      "bytes": 5538
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/proof-checker/SKILL.md",
+      "sha256": "021f0e74ce1aa57e",
+      "bytes": 58251
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/proof-orchestrator/NOTICE.md",
+      "sha256": "a496eb4ac401ae1f",
+      "bytes": 1147
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/proof-orchestrator/references/audit-output-contract.md",
+      "sha256": "cff8da1ef42794c6",
+      "bytes": 4503
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/proof-orchestrator/references/deepseek-routing.md",
+      "sha256": "f2a99c54b25a0c22",
+      "bytes": 3479
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/proof-orchestrator/references/dispatch-prompts.md",
+      "sha256": "a32693defd4ec03f",
+      "bytes": 7841
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/proof-orchestrator/references/notation-audit.md",
+      "sha256": "8db3079a9209d9c7",
+      "bytes": 5327
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/proof-orchestrator/references/proof-audit-rubric.md",
+      "sha256": "fb962314da5291f5",
+      "bytes": 4430
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/proof-orchestrator/references/stress-tests.md",
+      "sha256": "5d865f4bc1df6d87",
+      "bytes": 1825
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/proof-orchestrator/SKILL.md",
+      "sha256": "3f656998d43ac0d9",
+      "bytes": 19343
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/proof-writer/SKILL.md",
+      "sha256": "9642682885568ebf",
+      "bytes": 8374
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/qzcli/SKILL.md",
+      "sha256": "328953e6e4a21f8a",
+      "bytes": 7947
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/rebuttal/SKILL.md",
+      "sha256": "42f5a1e550ea2441",
+      "bytes": 26406
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/render-html/scripts/render_html.py",
+      "sha256": "c9499080a39b7079",
+      "bytes": 41958
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/render-html/scripts/templates/academic.html",
+      "sha256": "af3a2f998091edd2",
+      "bytes": 21148
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/render-html/scripts/templates/dashboard.html",
+      "sha256": "156e0825a131279d",
+      "bytes": 8371
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/render-html/SKILL.md",
+      "sha256": "29a88d8eb21f28de",
+      "bytes": 23907
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/research-implement-feature/SKILL.md",
+      "sha256": "c80bae7e6f5face1",
+      "bytes": 33241
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/research-lit/SKILL.md",
+      "sha256": "0eaedb14ae75c01d",
+      "bytes": 46774
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/research-pipeline/SKILL.md",
+      "sha256": "6cad5c3f2d6cf685",
+      "bytes": 25107
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/research-refine/SKILL.md",
+      "sha256": "2839a2ee262b967e",
+      "bytes": 35268
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/research-refine-pipeline/SKILL.md",
+      "sha256": "d7e31b15fd06ec3d",
+      "bytes": 7417
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/research-review/SKILL.md",
+      "sha256": "36c58e804e28dd45",
+      "bytes": 14731
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/research-wiki/SKILL.md",
+      "sha256": "d3019d99afdeba53",
+      "bytes": 21398
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/resubmit-pipeline/SKILL.md",
+      "sha256": "b6cf0e38df1035cb",
+      "bytes": 35100
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/result-to-claim/SKILL.md",
+      "sha256": "48b48d3843a1a85b",
+      "bytes": 18772
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/run-experiment/SKILL.md",
+      "sha256": "4d481ce95d8bcadb",
+      "bytes": 12848
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/semantic-scholar/SKILL.md",
+      "sha256": "8fee7f56c360c25e",
+      "bytes": 11168
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/serverless-modal/SKILL.md",
+      "sha256": "e8444d7c5e4cb53f",
+      "bytes": 13161
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/shared-references/acceptance-gate.md",
+      "sha256": "acfe2e790d974453",
+      "bytes": 16967
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/shared-references/assurance-contract.md",
+      "sha256": "4320cc8f8614f959",
+      "bytes": 13572
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/shared-references/capture-antipatterns.md",
+      "sha256": "11b9db9e3ec8742d",
+      "bytes": 4593
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/shared-references/citation-discipline.md",
+      "sha256": "65a9ef0796a920d2",
+      "bytes": 20707
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/shared-references/compute-env-contract.md",
+      "sha256": "0d502540dbd3d678",
+      "bytes": 10729
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/shared-references/effort-contract.md",
+      "sha256": "c1cb84a099d7d465",
+      "bytes": 8352
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/shared-references/evidence-precheck.md",
+      "sha256": "9c297028703cdab6",
+      "bytes": 3311
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/shared-references/experiment-integrity.md",
+      "sha256": "22150fbdc5867e77",
+      "bytes": 2355
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/shared-references/external-cadence.md",
+      "sha256": "388aab189f114b8e",
+      "bytes": 19407
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/shared-references/fan-out-pattern.md",
+      "sha256": "e7322641c88b77e6",
+      "bytes": 21698
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/shared-references/injection-hygiene.md",
+      "sha256": "dbf63c5a9b8409ad",
+      "bytes": 7594
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/shared-references/integration-contract.md",
+      "sha256": "0b06b5cf32e330b2",
+      "bytes": 27310
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/shared-references/output-composition.md",
+      "sha256": "8de81708431091a2",
+      "bytes": 5005
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/shared-references/output-language.md",
+      "sha256": "7b326400dca5130c",
+      "bytes": 2215
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/shared-references/output-manifest.md",
+      "sha256": "28e29bc8e53c52af",
+      "bytes": 2354
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/shared-references/output-versioning.md",
+      "sha256": "73a4269b537be728",
+      "bytes": 4807
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/shared-references/patent-format-cn.md",
+      "sha256": "e5be6c2c6fab3c84",
+      "bytes": 9352
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/shared-references/patent-format-ep.md",
+      "sha256": "8cf58ac775fe524c",
+      "bytes": 6542
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/shared-references/patent-format-us.md",
+      "sha256": "13f179cc70fc8664",
+      "bytes": 6151
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/shared-references/patent-writing-principles.md",
+      "sha256": "8c8dc8250948bd07",
+      "bytes": 9032
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/shared-references/prior-art-databases.md",
+      "sha256": "8225843987fbabb5",
+      "bytes": 5455
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/shared-references/resumable-runs.md",
+      "sha256": "c2958957736e6b44",
+      "bytes": 6798
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/shared-references/review-scope-limits.md",
+      "sha256": "e383dbaa57aed6f8",
+      "bytes": 4174
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/shared-references/review-tracing.md",
+      "sha256": "592d5845a98dad28",
+      "bytes": 24256
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/shared-references/reviewer-backends.md",
+      "sha256": "89df79644641b051",
+      "bytes": 9867
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/shared-references/reviewer-independence.md",
+      "sha256": "fbbfcb6e7ff53010",
+      "bytes": 3473
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/shared-references/reviewer-routing.md",
+      "sha256": "344bd70bc828e8df",
+      "bytes": 53374
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/shared-references/skill-governance.md",
+      "sha256": "2da8e745ce5dc511",
+      "bytes": 5710
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/shared-references/taste-calibration.md",
+      "sha256": "245e12a52b6c0130",
+      "bytes": 4515
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/shared-references/venue-checklists.md",
+      "sha256": "712396be66d4db85",
+      "bytes": 5582
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/shared-references/wiki-helper-resolution.md",
+      "sha256": "54d024f56a563244",
+      "bytes": 6654
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/shared-references/writing-principles.md",
+      "sha256": "23142c901d034ab0",
+      "bytes": 17539
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/ablation-planner/SKILL.md",
+      "sha256": "8383bc55d53adb29",
+      "bytes": 5416
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/alphaxiv/SKILL.md",
+      "sha256": "614b9ff38e7cad56",
+      "bytes": 9013
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/analyze-results/SKILL.md",
+      "sha256": "1a5f798558018fe6",
+      "bytes": 1568
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/arxiv/SKILL.md",
+      "sha256": "a2a500396884249b",
+      "bytes": 8045
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/auto-paper-improvement-loop/SKILL.md",
+      "sha256": "e7b38c240df1008e",
+      "bytes": 38476
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/auto-review-loop/SKILL.md",
+      "sha256": "c957fdc33466fcde",
+      "bytes": 33201
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/auto-review-loop-llm/SKILL.md",
+      "sha256": "45af6a448777f12f",
+      "bytes": 8596
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/auto-review-loop-minimax/SKILL.md",
+      "sha256": "a6f768b079f1ef3f",
+      "bytes": 12132
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/citation-audit/SKILL.md",
+      "sha256": "d60bdd9f099e8dc2",
+      "bytes": 32489
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/citation-crosscheck/scripts/cx_verify.py",
+      "sha256": "b15462f33db4f5a4",
+      "bytes": 86079
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/citation-crosscheck/SKILL.md",
+      "sha256": "2e33959d5f6f3337",
+      "bytes": 39343
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/claims-drafting/SKILL.md",
+      "sha256": "0bc66ee3f1441c43",
+      "bytes": 12227
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/comm-lit-review/references/domain-taxonomy.md",
+      "sha256": "fe60f6da0a53df9c",
+      "bytes": 1479
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/comm-lit-review/references/output-template.md",
+      "sha256": "a189d60a9c5f439d",
+      "bytes": 983
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/comm-lit-review/references/source-policy.md",
+      "sha256": "36db0b748275c7a1",
+      "bytes": 3116
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/comm-lit-review/references/venue-tiering.md",
+      "sha256": "44568b391ceb668f",
+      "bytes": 3095
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/comm-lit-review/SKILL.md",
+      "sha256": "73187987d569dd69",
+      "bytes": 9557
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/deepxiv/SKILL.md",
+      "sha256": "d8be1195b10d027d",
+      "bytes": 6187
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/dse-loop/SKILL.md",
+      "sha256": "daf99d22d3fd955c",
+      "bytes": 13588
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/embodiment-description/SKILL.md",
+      "sha256": "8833b45694350775",
+      "bytes": 6732
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/exa-search/SKILL.md",
+      "sha256": "d49a39588f9372b2",
+      "bytes": 8228
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/experiment-audit/SKILL.md",
+      "sha256": "142ab0186334bc6d",
+      "bytes": 12812
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/experiment-bridge/SKILL.md",
+      "sha256": "2b7aaab38753f3ae",
+      "bytes": 17645
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/experiment-plan/SKILL.md",
+      "sha256": "61812df053fd8717",
+      "bytes": 9665
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/experiment-queue/SKILL.md",
+      "sha256": "8aea9bc2d31a1b1d",
+      "bytes": 16773
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/feishu-notify/SKILL.md",
+      "sha256": "12ba4c282e594a26",
+      "bytes": 6087
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/figure-description/SKILL.md",
+      "sha256": "4c69bc650a67d168",
+      "bytes": 5000
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/figure-spec/SKILL.md",
+      "sha256": "3c8d5c51d237768c",
+      "bytes": 12999
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/firecrawl-search/SKILL.md",
+      "sha256": "1131bd5354e4cd6d",
+      "bytes": 11451
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/formula-derivation/SKILL.md",
+      "sha256": "1958b1fe25459c36",
+      "bytes": 9527
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/gemini-search/SKILL.md",
+      "sha256": "c9cc1d28433e731d",
+      "bytes": 9337
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/grant-proposal/SKILL.md",
+      "sha256": "c361e78f98ffbf54",
+      "bytes": 31592
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/idea-creator/SKILL.md",
+      "sha256": "6ff3d300d0a8cee6",
+      "bytes": 26612
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/idea-discovery/SKILL.md",
+      "sha256": "6664d8902b63f4f8",
+      "bytes": 23438
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/idea-discovery-robot/SKILL.md",
+      "sha256": "34cac6ec8a44fa6e",
+      "bytes": 15898
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/integrity-forensics/SKILL.md",
+      "sha256": "32895ebf01c923d9",
+      "bytes": 6289
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/interview-cheatsheet/SKILL.md",
+      "sha256": "f97aeb21bed73348",
+      "bytes": 15402
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/invention-structuring/SKILL.md",
+      "sha256": "d3fe12e2b7562fc2",
+      "bytes": 8495
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/jurisdiction-format/SKILL.md",
+      "sha256": "7683f58c4ad6465b",
+      "bytes": 6816
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/keenable-search/SKILL.md",
+      "sha256": "9ef716f6f81c8ec7",
+      "bytes": 6769
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/kill-argument/SKILL.md",
+      "sha256": "3fdae52c0ac4cdba",
+      "bytes": 24209
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/lean-formalize/agents/openai.yaml",
+      "sha256": "39ced7d021fe6226",
+      "bytes": 261
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/lean-formalize/references/adversarial-review.md",
+      "sha256": "258e718bb63b96a8",
+      "bytes": 14165
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/lean-formalize/references/lean-working-loop.md",
+      "sha256": "33368e31eb1dc748",
+      "bytes": 10625
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/lean-formalize/references/verification-and-handoff.md",
+      "sha256": "13c498361096ebea",
+      "bytes": 6332
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/lean-formalize/SKILL.md",
+      "sha256": "462e896dc108e909",
+      "bytes": 22343
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/mermaid-diagram/SKILL.md",
+      "sha256": "6476810ed42334da",
+      "bytes": 12163
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/meta-apply/SKILL.md",
+      "sha256": "f0b7568fd30175ce",
+      "bytes": 10314
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/meta-optimize/SKILL.md",
+      "sha256": "c5cad3615ddae9a4",
+      "bytes": 19351
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/monitor-experiment/SKILL.md",
+      "sha256": "4253b326af2147aa",
+      "bytes": 3474
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/novelty-check/SKILL.md",
+      "sha256": "1a41e332da254351",
+      "bytes": 7412
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/openalex/SKILL.md",
+      "sha256": "1dccd5750241129c",
+      "bytes": 10270
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/overleaf-sync/SKILL.md",
+      "sha256": "7fe066b2bf2cf150",
+      "bytes": 11335
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/paper-claim-audit/SKILL.md",
+      "sha256": "c7f25873eff5386b",
+      "bytes": 15750
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/paper-compile/SKILL.md",
+      "sha256": "a53254a11fbc7844",
+      "bytes": 9633
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/paper-figure/SKILL.md",
+      "sha256": "a153b73a5df67c48",
+      "bytes": 14383
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/paper-illustration/SKILL.md",
+      "sha256": "56438b1d40645467",
+      "bytes": 30719
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/paper-illustration-image2/scripts/paper_illustration_image2.py",
+      "sha256": "aa67846acdaf623e",
+      "bytes": 8999
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/paper-illustration-image2/SKILL.md",
+      "sha256": "8d6f3f5b9f2a8c02",
+      "bytes": 20925
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/paper-plan/SKILL.md",
+      "sha256": "715f69f3e6541256",
+      "bytes": 13694
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/paper-poster/SKILL.md",
+      "sha256": "fea8d7e3f4a07d0b",
+      "bytes": 841
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/paper-poster-html/SKILL.md",
+      "sha256": "2599d4b415cb1c93",
+      "bytes": 23107
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/paper-slides/SKILL.md",
+      "sha256": "aa03f679b2842e06",
+      "bytes": 21492
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/paper-talk/SKILL.md",
+      "sha256": "19b068a5dceee559",
+      "bytes": 22131
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/paper-write/SKILL.md",
+      "sha256": "31e08c10b6044776",
+      "bytes": 28550
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/paper-write/templates/aaai2026.bst",
+      "sha256": "ac26e2c66047435c",
+      "bytes": 30207
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/paper-write/templates/aaai2026.sty",
+      "sha256": "a39f1866a04dd1e2",
+      "bytes": 11802
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/paper-write/templates/aaai2026.tex",
+      "sha256": "bed12c50b5e027fd",
+      "bytes": 63140
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/paper-write/templates/acl.sty",
+      "sha256": "19dfeddc2c0e448f",
+      "bytes": 11615
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/paper-write/templates/acl2026.tex",
+      "sha256": "339c9ee9705c1767",
+      "bytes": 14533
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/paper-write/templates/acl_natbib.bst",
+      "sha256": "e332fd51dcea48e2",
+      "bytes": 45186
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/paper-write/templates/acm.bst",
+      "sha256": "ecbc9bfbf595d820",
+      "bytes": 90333
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/paper-write/templates/acmart.cls",
+      "sha256": "560afeefdb1834d8",
+      "bytes": 116554
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/paper-write/templates/acm_mm2026.tex",
+      "sha256": "c350a3f470e8f356",
+      "bytes": 5802
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/paper-write/templates/cvpr.bst",
+      "sha256": "e38e6166bd7b1e6d",
+      "bytes": 26900
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/paper-write/templates/cvpr.sty",
+      "sha256": "2602473285d1a7df",
+      "bytes": 17969
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/paper-write/templates/cvpr2026.tex",
+      "sha256": "251329b8a7ea25f1",
+      "bytes": 2116
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/paper-write/templates/iclr2026.tex",
+      "sha256": "1e4c20b3c5b74459",
+      "bytes": 1924
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/paper-write/templates/iclr2026_conference.bst",
+      "sha256": "2d67552db7ed38cc",
+      "bytes": 26973
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/paper-write/templates/iclr2026_conference.sty",
+      "sha256": "a4852f68e080d6c5",
+      "bytes": 9025
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/paper-write/templates/icml2026.sty",
+      "sha256": "7cdcf90f6a59c521",
+      "bytes": 27344
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/paper-write/templates/icml2026.tex",
+      "sha256": "c2ca8140bf255d1f",
+      "bytes": 29714
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/paper-write/templates/IEEEtran.bst",
+      "sha256": "314f0ece704568fa",
+      "bytes": 57748
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/paper-write/templates/IEEEtran.cls",
+      "sha256": "da751920a317ed31",
+      "bytes": 281957
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/paper-write/templates/ieee_conference.tex",
+      "sha256": "a3dc3a175a7dd151",
+      "bytes": 2124
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/paper-write/templates/ieee_journal.tex",
+      "sha256": "bdff7ff0aa376d8a",
+      "bytes": 2557
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/paper-write/templates/math_commands.tex",
+      "sha256": "3efe4556b2c33b4a",
+      "bytes": 1279
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/paper-write/templates/neurips2026.tex",
+      "sha256": "d436d14ee70d6a1e",
+      "bytes": 19076
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/paper-write/templates/neurips_2026.sty",
+      "sha256": "0c1ad36961fcd919",
+      "bytes": 13462
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/paper-writing/SKILL.md",
+      "sha256": "ea1e121edb112daa",
+      "bytes": 39532
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/patent-novelty-check/SKILL.md",
+      "sha256": "5d8ec260b2196308",
+      "bytes": 7517
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/patent-pipeline/SKILL.md",
+      "sha256": "fde7da9a5763e689",
+      "bytes": 15268
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/patent-review/SKILL.md",
+      "sha256": "c6f16dfe0d22e9c5",
+      "bytes": 8591
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/pixel-art/SKILL.md",
+      "sha256": "96ccea96d27140be",
+      "bytes": 5596
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/prior-art-search/SKILL.md",
+      "sha256": "8793fb26c522de4c",
+      "bytes": 5538
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/proof-checker/SKILL.md",
+      "sha256": "19ef1996855671a8",
+      "bytes": 33264
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/proof-orchestrator/references/audit-output-contract.md",
+      "sha256": "cff8da1ef42794c6",
+      "bytes": 4503
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/proof-orchestrator/references/deepseek-routing.md",
+      "sha256": "829b21541445f857",
+      "bytes": 3590
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/proof-orchestrator/references/dispatch-prompts.md",
+      "sha256": "21f0f279dd24f98c",
+      "bytes": 7823
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/proof-orchestrator/references/notation-audit.md",
+      "sha256": "8db3079a9209d9c7",
+      "bytes": 5327
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/proof-orchestrator/references/proof-audit-rubric.md",
+      "sha256": "fb962314da5291f5",
+      "bytes": 4430
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/proof-orchestrator/references/stress-tests.md",
+      "sha256": "93c4c054f14dfe6a",
+      "bytes": 1812
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/proof-orchestrator/SKILL.md",
+      "sha256": "d4c06928e9281ad7",
+      "bytes": 19099
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/proof-writer/SKILL.md",
+      "sha256": "9791fd55d8bedaed",
+      "bytes": 8297
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/qzcli/SKILL.md",
+      "sha256": "328953e6e4a21f8a",
+      "bytes": 7947
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/README.md",
+      "sha256": "d1f6d4730c94377e",
+      "bytes": 8540
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/README_CN.md",
+      "sha256": "33fb8e7d58410827",
+      "bytes": 4678
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/rebuttal/SKILL.md",
+      "sha256": "4b9a1b9c4b4da0cf",
+      "bytes": 17256
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/render-html/scripts/render_html.py",
+      "sha256": "7ba9d4e724b1d5ce",
+      "bytes": 37936
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/render-html/scripts/templates/academic.html",
+      "sha256": "0ce224f68f320252",
+      "bytes": 8651
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/render-html/scripts/templates/dashboard.html",
+      "sha256": "156e0825a131279d",
+      "bytes": 8371
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/render-html/SKILL.md",
+      "sha256": "851233a93bea9f07",
+      "bytes": 22077
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/research-implement-feature/SKILL.md",
+      "sha256": "5151b8cfa756bc9d",
+      "bytes": 23212
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/research-lit/SKILL.md",
+      "sha256": "680938d0066acda5",
+      "bytes": 31296
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/research-pipeline/SKILL.md",
+      "sha256": "8098ddcd4e655cfb",
+      "bytes": 21485
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/research-refine/SKILL.md",
+      "sha256": "0bd57b339f0badf2",
+      "bytes": 31895
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/research-refine-pipeline/SKILL.md",
+      "sha256": "65538a42c2f697c6",
+      "bytes": 6930
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/research-review/SKILL.md",
+      "sha256": "17505d5982c82e82",
+      "bytes": 9163
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/research-wiki/SKILL.md",
+      "sha256": "792d47ed0f4bc57c",
+      "bytes": 18439
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/resubmit-pipeline/SKILL.md",
+      "sha256": "4ffe9544a835734c",
+      "bytes": 34452
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/result-to-claim/SKILL.md",
+      "sha256": "fa31e905b9cc4c6e",
+      "bytes": 14187
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/run-experiment/SKILL.md",
+      "sha256": "8325128eab14c7f8",
+      "bytes": 8909
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/semantic-scholar/SKILL.md",
+      "sha256": "f9ca5aa332bf078b",
+      "bytes": 10707
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/serverless-modal/SKILL.md",
+      "sha256": "a57ba889e70f4108",
+      "bytes": 13169
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/shared-references/acceptance-gate.md",
+      "sha256": "0d1ef8b2d60932b9",
+      "bytes": 19333
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/shared-references/assurance-contract.md",
+      "sha256": "05dfc6d1d68b6c79",
+      "bytes": 7707
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/shared-references/capture-antipatterns.md",
+      "sha256": "f09e2a5203b6b301",
+      "bytes": 5347
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/shared-references/citation-discipline.md",
+      "sha256": "1c51dc936bbc3dbb",
+      "bytes": 13918
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/shared-references/compute-env-contract.md",
+      "sha256": "23f6eb31dc5b6026",
+      "bytes": 10739
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/shared-references/effort-contract.md",
+      "sha256": "d4a53faf13d19d5d",
+      "bytes": 5999
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/shared-references/evidence-precheck.md",
+      "sha256": "ef01e39e4b5c2b1a",
+      "bytes": 4131
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/shared-references/experiment-integrity.md",
+      "sha256": "22150fbdc5867e77",
+      "bytes": 2355
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/shared-references/external-cadence.md",
+      "sha256": "c8000331984f12b9",
+      "bytes": 20511
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/shared-references/fan-out-pattern.md",
+      "sha256": "b35410403fbf2d95",
+      "bytes": 23134
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/shared-references/injection-hygiene.md",
+      "sha256": "4431bcdca0504b6d",
+      "bytes": 8178
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/shared-references/integration-contract.md",
+      "sha256": "0034d1765407eafd",
+      "bytes": 20341
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/shared-references/output-composition.md",
+      "sha256": "ae9e4d6c20193cd8",
+      "bytes": 5391
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/shared-references/output-language.md",
+      "sha256": "0f1447579bd7a219",
+      "bytes": 2215
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/shared-references/output-manifest.md",
+      "sha256": "e767083e0ef97a7a",
+      "bytes": 1753
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/shared-references/output-versioning.md",
+      "sha256": "de8e7ac23069de6c",
+      "bytes": 4828
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/shared-references/patent-format-cn.md",
+      "sha256": "e5be6c2c6fab3c84",
+      "bytes": 9352
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/shared-references/patent-format-ep.md",
+      "sha256": "8cf58ac775fe524c",
+      "bytes": 6542
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/shared-references/patent-format-us.md",
+      "sha256": "13f179cc70fc8664",
+      "bytes": 6151
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/shared-references/patent-writing-principles.md",
+      "sha256": "8c8dc8250948bd07",
+      "bytes": 9032
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/shared-references/prior-art-databases.md",
+      "sha256": "8225843987fbabb5",
+      "bytes": 5455
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/shared-references/resumable-runs.md",
+      "sha256": "27bae8ed86cefa0b",
+      "bytes": 8252
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/shared-references/review-scope-limits.md",
+      "sha256": "e383dbaa57aed6f8",
+      "bytes": 4174
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/shared-references/review-tracing.md",
+      "sha256": "fd1e524d1d78dd2d",
+      "bytes": 9517
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/shared-references/reviewer-backends.md",
+      "sha256": "89df79644641b051",
+      "bytes": 9867
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/shared-references/reviewer-independence.md",
+      "sha256": "326a2ed68aa25dd5",
+      "bytes": 1809
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/shared-references/reviewer-routing.md",
+      "sha256": "b0ce923454caf49e",
+      "bytes": 8348
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/shared-references/skill-governance.md",
+      "sha256": "896f58cfbf31795a",
+      "bytes": 7344
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/shared-references/taste-calibration.md",
+      "sha256": "ab5880c4989e2d05",
+      "bytes": 4819
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/shared-references/venue-checklists.md",
+      "sha256": "aef7a0c396078747",
+      "bytes": 2939
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/shared-references/wiki-helper-resolution.md",
+      "sha256": "9a6568b4e20e4c58",
+      "bytes": 3072
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/shared-references/writing-principles.md",
+      "sha256": "23142c901d034ab0",
+      "bytes": 17539
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/slides-polish/SKILL.md",
+      "sha256": "23d762c0df7401ea",
+      "bytes": 30812
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/specification-writing/SKILL.md",
+      "sha256": "f2941c3d048c1a2b",
+      "bytes": 10285
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/system-profile/SKILL.md",
+      "sha256": "9d31e32d2a63cf2f",
+      "bytes": 4473
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/training-check/SKILL.md",
+      "sha256": "2708dfb66ec1cabb",
+      "bytes": 6203
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/vast-gpu/SKILL.md",
+      "sha256": "97ae94269d5f0b66",
+      "bytes": 16130
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/web-debug-search/SKILL.md",
+      "sha256": "ffb5f3ccf61c45d9",
+      "bytes": 15068
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/wiki-enrich/SKILL.md",
+      "sha256": "5b4ea60b70be3ab1",
+      "bytes": 17049
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex/writing-systems-papers/SKILL.md",
+      "sha256": "14a79a6b44b8e072",
+      "bytes": 6859
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex-claude-review/auto-paper-improvement-loop/SKILL.md",
+      "sha256": "1a04bad389c58d33",
+      "bytes": 36983
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex-claude-review/auto-review-loop/SKILL.md",
+      "sha256": "cd2e877606a8b3eb",
+      "bytes": 30452
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex-claude-review/novelty-check/SKILL.md",
+      "sha256": "a3e47ee6f5240027",
+      "bytes": 7383
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex-claude-review/paper-figure/SKILL.md",
+      "sha256": "1e2ec8dfeff340a6",
+      "bytes": 14208
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex-claude-review/paper-plan/SKILL.md",
+      "sha256": "273a99d453145e2d",
+      "bytes": 13183
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex-claude-review/paper-write/SKILL.md",
+      "sha256": "f30d2b055883fcb9",
+      "bytes": 27669
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex-claude-review/README.md",
+      "sha256": "83acf67373e8c6a8",
+      "bytes": 3007
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex-claude-review/README_CN.md",
+      "sha256": "ac160ef15f5e197a",
+      "bytes": 2950
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex-claude-review/research-refine/SKILL.md",
+      "sha256": "9cb8f40b527028e4",
+      "bytes": 32172
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex-claude-review/research-review/SKILL.md",
+      "sha256": "0715be32cec0e4c8",
+      "bytes": 9711
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex-gemini-review/auto-paper-improvement-loop/SKILL.md",
+      "sha256": "418edbee8d6c61bf",
+      "bytes": 17170
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex-gemini-review/auto-review-loop/SKILL.md",
+      "sha256": "b98a321c39d4285f",
+      "bytes": 15066
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex-gemini-review/grant-proposal/SKILL.md",
+      "sha256": "8e834ea2ce5fc825",
+      "bytes": 31605
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex-gemini-review/idea-creator/SKILL.md",
+      "sha256": "c36de92a79018ce3",
+      "bytes": 16715
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex-gemini-review/idea-discovery/SKILL.md",
+      "sha256": "618a9f8aa7ea804e",
+      "bytes": 12967
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex-gemini-review/idea-discovery-robot/SKILL.md",
+      "sha256": "dd0e7f33bff7b7a1",
+      "bytes": 15426
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex-gemini-review/novelty-check/SKILL.md",
+      "sha256": "06a0811f9693dc05",
+      "bytes": 6705
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex-gemini-review/paper-figure/SKILL.md",
+      "sha256": "5dc702aa809cf4a5",
+      "bytes": 12514
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex-gemini-review/paper-plan/SKILL.md",
+      "sha256": "74cb50a2ca3f0961",
+      "bytes": 10966
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex-gemini-review/paper-poster-html/SKILL.md",
+      "sha256": "96d680a11f7f0f5e",
+      "bytes": 5595
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex-gemini-review/paper-slides/SKILL.md",
+      "sha256": "0abfbb949938a7bd",
+      "bytes": 21327
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex-gemini-review/paper-write/SKILL.md",
+      "sha256": "1b37c50aaa69fad1",
+      "bytes": 22091
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex-gemini-review/paper-writing/SKILL.md",
+      "sha256": "0b493141db62c5fd",
+      "bytes": 13711
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex-gemini-review/README.md",
+      "sha256": "6499f6a16fa0c82b",
+      "bytes": 7312
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex-gemini-review/README_CN.md",
+      "sha256": "8c669389cbd584de",
+      "bytes": 7227
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex-gemini-review/research-refine/SKILL.md",
+      "sha256": "e70c912082ebe407",
+      "bytes": 29410
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/skills-codex-gemini-review/research-review/SKILL.md",
+      "sha256": "4eb4c02cce4b1108",
+      "bytes": 7435
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/slides-polish/SKILL.md",
+      "sha256": "435a636c8f1bf006",
+      "bytes": 30906
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/specification-writing/SKILL.md",
+      "sha256": "e31d7180af4122aa",
+      "bytes": 10326
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/system-profile/SKILL.md",
+      "sha256": "9d31e32d2a63cf2f",
+      "bytes": 4473
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/training-check/SKILL.md",
+      "sha256": "63443c8f8a970a35",
+      "bytes": 7475
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/vast-gpu/SKILL.md",
+      "sha256": "10f351854aa60466",
+      "bytes": 16130
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/web-debug-search/SKILL.md",
+      "sha256": "ffb5f3ccf61c45d9",
+      "bytes": 15068
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/wiki-enrich/SKILL.md",
+      "sha256": "0e739e8862746152",
+      "bytes": 16879
+    },
+    {
+      "p": ".dsh/skills/aris/references/skills/writing-systems-papers/SKILL.md",
+      "sha256": "1731c0a4b82b0aca",
+      "bytes": 7300
+    },
+    {
+      "p": ".dsh/skills/aris/references/templates/claude-hooks/corpus_write_guard.json",
+      "sha256": "294aec199ed30676",
+      "bytes": 852
+    },
+    {
+      "p": ".dsh/skills/aris/references/templates/claude-hooks/corpus_write_guard.py",
+      "sha256": "7807e0b8a805442a",
+      "bytes": 4390
+    },
+    {
+      "p": ".dsh/skills/aris/references/templates/claude-hooks/meta_logging.json",
+      "sha256": "4162f4d902e6ba67",
+      "bytes": 1753
+    },
+    {
+      "p": ".dsh/skills/aris/references/templates/CLAUDE_MD_TEMPLATE.md",
+      "sha256": "b0676223a52aa3c6",
+      "bytes": 884
+    },
+    {
+      "p": ".dsh/skills/aris/references/templates/EXPERIMENT_LOG_TEMPLATE.md",
+      "sha256": "32126068df3cf216",
+      "bytes": 1670
+    },
+    {
+      "p": ".dsh/skills/aris/references/templates/EXPERIMENT_PLAN_TEMPLATE.md",
+      "sha256": "a28f0795f4c8e203",
+      "bytes": 1926
+    },
+    {
+      "p": ".dsh/skills/aris/references/templates/EXPERIMENT_PLAN_TEMPLATE_CN.md",
+      "sha256": "bec2b65c78f95902",
+      "bytes": 1947
+    },
+    {
+      "p": ".dsh/skills/aris/references/templates/FINDINGS_TEMPLATE.md",
+      "sha256": "c3d98f53f780a5c9",
+      "bytes": 2579
+    },
+    {
+      "p": ".dsh/skills/aris/references/templates/gitignore-trace.txt",
+      "sha256": "9fbc968ad5c3f249",
+      "bytes": 160
+    },
+    {
+      "p": ".dsh/skills/aris/references/templates/IDEA_CANDIDATES_TEMPLATE.md",
+      "sha256": "832bf7ac92489498",
+      "bytes": 1812
+    },
+    {
+      "p": ".dsh/skills/aris/references/templates/IDEA_CANDIDATES_TEMPLATE_CN.md",
+      "sha256": "b57f0086f8fcbe91",
+      "bytes": 1840
+    },
+    {
+      "p": ".dsh/skills/aris/references/templates/INVENTION_BRIEF_TEMPLATE.md",
+      "sha256": "9fd8c4ca0912bfd5",
+      "bytes": 3187
+    },
+    {
+      "p": ".dsh/skills/aris/references/templates/MANIFEST_TEMPLATE.md",
+      "sha256": "513bc08b2744b208",
+      "bytes": 338
+    },
+    {
+      "p": ".dsh/skills/aris/references/templates/NARRATIVE_REPORT_TEMPLATE.md",
+      "sha256": "108481c051e96976",
+      "bytes": 1098
+    },
+    {
+      "p": ".dsh/skills/aris/references/templates/PAPER_PLAN_TEMPLATE.md",
+      "sha256": "0c323fa0e65c0d9e",
+      "bytes": 1172
+    },
+    {
+      "p": ".dsh/skills/aris/references/templates/PATENT_CLAIMS_TEMPLATE.md",
+      "sha256": "cbcfcb9715e95108",
+      "bytes": 2733
+    },
+    {
+      "p": ".dsh/skills/aris/references/templates/PATENT_SPECIFICATION_TEMPLATE.md",
+      "sha256": "8a058790ac4b97ae",
+      "bytes": 2130
+    },
+    {
+      "p": ".dsh/skills/aris/references/templates/README.md",
+      "sha256": "334aac9654abd110",
+      "bytes": 3064
+    },
+    {
+      "p": ".dsh/skills/aris/references/templates/RESEARCH_BRIEF_TEMPLATE.md",
+      "sha256": "f3aae6dcb26028a4",
+      "bytes": 1382
+    },
+    {
+      "p": ".dsh/skills/aris/references/templates/RESEARCH_BRIEF_TEMPLATE_CN.md",
+      "sha256": "4e341cc84147061b",
+      "bytes": 1287
+    },
+    {
+      "p": ".dsh/skills/aris/references/templates/RESEARCH_CONTRACT_TEMPLATE.md",
+      "sha256": "e71ee594951a50aa",
+      "bytes": 2374
+    },
+    {
+      "p": ".dsh/skills/aris/references/upstream/.env.example",
+      "sha256": "7b34f1c898929eb7",
+      "bytes": 1329
+    },
+    {
+      "p": ".dsh/skills/aris/references/upstream/AGENT_GUIDE.md",
+      "sha256": "c4fba1e23339bed6",
+      "bytes": 22124
+    },
+    {
+      "p": ".dsh/skills/aris/references/upstream/CONTRIBUTING.md",
+      "sha256": "36febe620749a3f5",
+      "bytes": 2093
+    },
+    {
+      "p": ".dsh/skills/aris/references/upstream/CONTRIBUTING_CN.md",
+      "sha256": "42b1ec4bca40c118",
+      "bytes": 1955
+    },
+    {
+      "p": ".dsh/skills/aris/references/upstream/README.md",
+      "sha256": "d18b627ec5216f76",
+      "bytes": 242439
+    },
+    {
+      "p": ".dsh/skills/aris/references/upstream/README_CN.md",
+      "sha256": "88c26f2a2f80e702",
+      "bytes": 204163
+    },
+    {
+      "p": ".dsh/skills/aris/references/upstream/SETUP_GUIDE.md",
+      "sha256": "ff0d9bbcb826fbc1",
+      "bytes": 12566
+    },
+    {
+      "p": ".dsh/skills/aris/references/upstream/SETUP_GUIDE_CN.md",
+      "sha256": "1507a5449a2e5567",
+      "bytes": 12228
+    },
+    {
+      "p": ".dsh/skills/aris/references/upstream/xhs_post.md",
+      "sha256": "936d32464d662107",
+      "bytes": 3364
+    },
+    {
+      "p": ".dsh/skills/aris/SKILL.md",
+      "sha256": "046b2c2e3e9dc59b",
+      "bytes": 11230
+    },
+    {
+      "p": ".dsh/skills/aris/templates/claude-hooks/corpus_write_guard.json",
+      "sha256": "b32a2d9200be0d70",
+      "bytes": 837
+    },
+    {
+      "p": ".dsh/skills/aris/templates/claude-hooks/corpus_write_guard.py",
+      "sha256": "9005bc1bc9437895",
+      "bytes": 4307
+    },
+    {
+      "p": ".dsh/skills/aris/templates/claude-hooks/meta_logging.json",
+      "sha256": "4162f4d902e6ba67",
+      "bytes": 1753
+    },
+    {
+      "p": ".dsh/skills/aris/templates/CLAUDE_MD_TEMPLATE.md",
+      "sha256": "b0676223a52aa3c6",
+      "bytes": 884
+    },
+    {
+      "p": ".dsh/skills/aris/templates/EXPERIMENT_LOG_TEMPLATE.md",
+      "sha256": "32126068df3cf216",
+      "bytes": 1670
+    },
+    {
+      "p": ".dsh/skills/aris/templates/EXPERIMENT_PLAN_TEMPLATE.md",
+      "sha256": "a28f0795f4c8e203",
+      "bytes": 1926
+    },
+    {
+      "p": ".dsh/skills/aris/templates/EXPERIMENT_PLAN_TEMPLATE_CN.md",
+      "sha256": "bec2b65c78f95902",
+      "bytes": 1947
+    },
+    {
+      "p": ".dsh/skills/aris/templates/FINDINGS_TEMPLATE.md",
+      "sha256": "c3d98f53f780a5c9",
+      "bytes": 2579
+    },
+    {
+      "p": ".dsh/skills/aris/templates/gitignore-trace.txt",
+      "sha256": "9fbc968ad5c3f249",
+      "bytes": 160
+    },
+    {
+      "p": ".dsh/skills/aris/templates/IDEA_CANDIDATES_TEMPLATE.md",
+      "sha256": "832bf7ac92489498",
+      "bytes": 1812
+    },
+    {
+      "p": ".dsh/skills/aris/templates/IDEA_CANDIDATES_TEMPLATE_CN.md",
+      "sha256": "b57f0086f8fcbe91",
+      "bytes": 1840
+    },
+    {
+      "p": ".dsh/skills/aris/templates/INVENTION_BRIEF_TEMPLATE.md",
+      "sha256": "9fd8c4ca0912bfd5",
+      "bytes": 3187
+    },
+    {
+      "p": ".dsh/skills/aris/templates/MANIFEST_TEMPLATE.md",
+      "sha256": "513bc08b2744b208",
+      "bytes": 338
+    },
+    {
+      "p": ".dsh/skills/aris/templates/NARRATIVE_REPORT_TEMPLATE.md",
+      "sha256": "108481c051e96976",
+      "bytes": 1098
+    },
+    {
+      "p": ".dsh/skills/aris/templates/PAPER_PLAN_TEMPLATE.md",
+      "sha256": "0c323fa0e65c0d9e",
+      "bytes": 1172
+    },
+    {
+      "p": ".dsh/skills/aris/templates/PATENT_CLAIMS_TEMPLATE.md",
+      "sha256": "cbcfcb9715e95108",
+      "bytes": 2733
+    },
+    {
+      "p": ".dsh/skills/aris/templates/PATENT_SPECIFICATION_TEMPLATE.md",
+      "sha256": "8a058790ac4b97ae",
+      "bytes": 2130
+    },
+    {
+      "p": ".dsh/skills/aris/templates/README.md",
+      "sha256": "334aac9654abd110",
+      "bytes": 3064
+    },
+    {
+      "p": ".dsh/skills/aris/templates/RESEARCH_BRIEF_TEMPLATE.md",
+      "sha256": "f3aae6dcb26028a4",
+      "bytes": 1382
+    },
+    {
+      "p": ".dsh/skills/aris/templates/RESEARCH_BRIEF_TEMPLATE_CN.md",
+      "sha256": "4e341cc84147061b",
+      "bytes": 1287
+    },
+    {
+      "p": ".dsh/skills/aris/templates/RESEARCH_CONTRACT_TEMPLATE.md",
+      "sha256": "e71ee594951a50aa",
+      "bytes": 2374
+    },
+    {
+      "p": ".dsh/skills/aris/tools/arxiv_fetch.py",
+      "sha256": "1c76157fc62da33a",
+      "bytes": 12093
+    },
+    {
+      "p": ".dsh/skills/aris/tools/audit_codex_invocation.py",
+      "sha256": "105244935402228f",
+      "bytes": 4855
+    },
+    {
+      "p": ".dsh/skills/aris/tools/capture_filter.py",
+      "sha256": "ba165d5da78f405e",
+      "bytes": 6205
+    },
+    {
+      "p": ".dsh/skills/aris/tools/check_skills_inventory.py",
+      "sha256": "4640567ed41b50a1",
+      "bytes": 14907
+    },
+    {
+      "p": ".dsh/skills/aris/tools/convert_skills_to_llm_chat.py",
+      "sha256": "b6ae00740ca76159",
+      "bytes": 11651
+    },
+    {
+      "p": ".dsh/skills/aris/tools/copilot_native_evidence.py",
+      "sha256": "43ec6a9b1dbb0374",
+      "bytes": 38001
+    },
+    {
+      "p": ".dsh/skills/aris/tools/cx_verify.py",
+      "sha256": "cdeb96d1b0717208",
+      "bytes": 16860
+    },
+    {
+      "p": ".dsh/skills/aris/tools/deepxiv_fetch.py",
+      "sha256": "96335c2877a076cf",
+      "bytes": 6434
+    },
+    {
+      "p": ".dsh/skills/aris/tools/evidence_check.py",
+      "sha256": "eeb892ffc92d5b40",
+      "bytes": 10181
+    },
+    {
+      "p": ".dsh/skills/aris/tools/exa_search.py",
+      "sha256": "65d7b7fb4ec5a05c",
+      "bytes": 14855
+    },
+    {
+      "p": ".dsh/skills/aris/tools/experiment_queue/build_manifest.py",
+      "sha256": "a1a0fd6671cb33b8",
+      "bytes": 1584
+    },
+    {
+      "p": ".dsh/skills/aris/tools/experiment_queue/queue_manager.py",
+      "sha256": "d7243dbcbc84489c",
+      "bytes": 1616
+    },
+    {
+      "p": ".dsh/skills/aris/tools/experiment_queue/README.md",
+      "sha256": "0216143499e919b7",
+      "bytes": 4354
+    },
+    {
+      "p": ".dsh/skills/aris/tools/extract_paper_style.py",
+      "sha256": "793a88ac4037fafa",
+      "bytes": 23251
+    },
+    {
+      "p": ".dsh/skills/aris/tools/figure_renderer.py",
+      "sha256": "832a65bdc5f4ecb7",
+      "bytes": 2650
+    },
+    {
+      "p": ".dsh/skills/aris/tools/firecrawl_search.py",
+      "sha256": "dfd8a0709764321f",
+      "bytes": 15561
+    },
+    {
+      "p": ".dsh/skills/aris/tools/forensics_gate.py",
+      "sha256": "db503cf5f428b3cf",
+      "bytes": 33373
+    },
+    {
+      "p": ".dsh/skills/aris/tools/generate_codex_claude_review_overrides.py",
+      "sha256": "77a96651c2f0b044",
+      "bytes": 19301
+    },
+    {
+      "p": ".dsh/skills/aris/tools/idea_discovery_gate.py",
+      "sha256": "819dd299c19993dd",
+      "bytes": 10366
+    },
+    {
+      "p": ".dsh/skills/aris/tools/install_aris.ps1",
+      "sha256": "9610cc1750dddf83",
+      "bytes": 73863
+    },
+    {
+      "p": ".dsh/skills/aris/tools/install_aris.sh",
+      "sha256": "7fed8f3032216d08",
+      "bytes": 81862
+    },
+    {
+      "p": ".dsh/skills/aris/tools/install_aris_codex.sh",
+      "sha256": "8d71964fd7fd9094",
+      "bytes": 43653
+    },
+    {
+      "p": ".dsh/skills/aris/tools/install_aris_copilot.sh",
+      "sha256": "58db9659dfcbfcd3",
+      "bytes": 44270
+    },
+    {
+      "p": ".dsh/skills/aris/tools/iteration_log.py",
+      "sha256": "51d13168dfd1163e",
+      "bytes": 5728
+    },
+    {
+      "p": ".dsh/skills/aris/tools/keenable_search.py",
+      "sha256": "7d177fa931912051",
+      "bytes": 11718
+    },
+    {
+      "p": ".dsh/skills/aris/tools/lint_skills_helpers.sh",
+      "sha256": "469132c2b56584a4",
+      "bytes": 3599
+    },
+    {
+      "p": ".dsh/skills/aris/tools/meta_opt/check_ready.sh",
+      "sha256": "6c581e592893db7f",
+      "bytes": 3449
+    },
+    {
+      "p": ".dsh/skills/aris/tools/meta_opt/log_event.sh",
+      "sha256": "c4185ab816d99406",
+      "bytes": 3256
+    },
+    {
+      "p": ".dsh/skills/aris/tools/meta_opt/trigger_eval.py",
+      "sha256": "23827170143d200c",
+      "bytes": 13662
+    },
+    {
+      "p": ".dsh/skills/aris/tools/meta_opt/trigger_evals.sample.json",
+      "sha256": "20db057ba06ac3c7",
+      "bytes": 1570
+    },
+    {
+      "p": ".dsh/skills/aris/tools/openalex_fetch.py",
+      "sha256": "db32919449aed530",
+      "bytes": 12431
+    },
+    {
+      "p": ".dsh/skills/aris/tools/overleaf_audit.sh",
+      "sha256": "2d4bcaa33d541a74",
+      "bytes": 3516
+    },
+    {
+      "p": ".dsh/skills/aris/tools/overleaf_setup.sh",
+      "sha256": "f2274ad4da248d59",
+      "bytes": 6412
+    },
+    {
+      "p": ".dsh/skills/aris/tools/paper_illustration_image2.py",
+      "sha256": "f7849753c53b0fe8",
+      "bytes": 2266
+    },
+    {
+      "p": ".dsh/skills/aris/tools/probe_codex_invocation.py",
+      "sha256": "0246aa296dad17f7",
+      "bytes": 3927
+    },
+    {
+      "p": ".dsh/skills/aris/tools/provenance.py",
+      "sha256": "ce88bbea5e9c1f93",
+      "bytes": 14047
+    },
+    {
+      "p": ".dsh/skills/aris/tools/requirements-codex-policy-audit.txt",
+      "sha256": "865bbefc83398c2d",
+      "bytes": 13
+    },
+    {
+      "p": ".dsh/skills/aris/tools/research_wiki.py",
+      "sha256": "9c9e0fe99b84fdd9",
+      "bytes": 80658
+    },
+    {
+      "p": ".dsh/skills/aris/tools/reviewer_route.py",
+      "sha256": "23975013a5dcd56d",
+      "bytes": 6412
+    },
+    {
+      "p": ".dsh/skills/aris/tools/review_gate.py",
+      "sha256": "1e64296ef9dd1b03",
+      "bytes": 21086
+    },
+    {
+      "p": ".dsh/skills/aris/tools/run_state.py",
+      "sha256": "3d506c5973302fd5",
+      "bytes": 18898
+    },
+    {
+      "p": ".dsh/skills/aris/tools/save_trace.sh",
+      "sha256": "cfed467e912c7936",
+      "bytes": 26903
+    },
+    {
+      "p": ".dsh/skills/aris/tools/semantic_scholar_fetch.py",
+      "sha256": "bdd548ab90d5b64f",
+      "bytes": 14812
+    },
+    {
+      "p": ".dsh/skills/aris/tools/skill-groups.tsv",
+      "sha256": "b9d0d67b4053436a",
+      "bytes": 9410
+    },
+    {
+      "p": ".dsh/skills/aris/tools/skill_picker.py",
+      "sha256": "23c7cc4f07527a3a",
+      "bytes": 9117
+    },
+    {
+      "p": ".dsh/skills/aris/tools/smart_update.ps1",
+      "sha256": "16ed12f54305e232",
+      "bytes": 22648
+    },
+    {
+      "p": ".dsh/skills/aris/tools/smart_update.sh",
+      "sha256": "513467fff2f0eb8e",
+      "bytes": 23523
+    },
+    {
+      "p": ".dsh/skills/aris/tools/smart_update_codex.sh",
+      "sha256": "c3b81e28e9434eb6",
+      "bytes": 15473
+    },
+    {
+      "p": ".dsh/skills/aris/tools/smart_update_copilot.sh",
+      "sha256": "72e2338010dd2437",
+      "bytes": 24321
+    },
+    {
+      "p": ".dsh/skills/aris/tools/threat_scan.py",
+      "sha256": "2017e786bcbe4c43",
+      "bytes": 12387
+    },
+    {
+      "p": ".dsh/skills/aris/tools/verify_papers.py",
+      "sha256": "0d6b9b2382cfa26f",
+      "bytes": 30319
+    },
+    {
+      "p": ".dsh/skills/aris/tools/verify_paper_audits.sh",
+      "sha256": "6896886ca9b8e60e",
+      "bytes": 22073
+    },
+    {
+      "p": ".dsh/skills/aris/tools/verify_wiki_coverage.sh",
+      "sha256": "c1749bedbb721972",
+      "bytes": 6939
+    },
+    {
+      "p": ".dsh/skills/aris/tools/watchdog.py",
+      "sha256": "4273eaa8954c5508",
+      "bytes": 19547
+    },
+    {
+      "p": ".gitignore",
+      "sha256": "eb8f0b8fd560d5b8",
+      "bytes": 572
+    },
+    {
+      "p": "bin/aris-audit.mjs",
+      "sha256": "739b1f508b0e6f9f",
+      "bytes": 6262
+    },
+    {
+      "p": "bin/aris-collect-all.cmd",
+      "sha256": "f02598d01e608157",
+      "bytes": 1210
+    },
+    {
+      "p": "bin/aris-collect-all.pyw",
+      "sha256": "f83a0f8b5e760025",
+      "bytes": 2173
+    },
+    {
+      "p": "bin/aris-fix-paths.mjs",
+      "sha256": "0629ca617c593ec8",
+      "bytes": 2349
+    },
+    {
+      "p": "bin/aris-review.mjs",
+      "sha256": "e8f24959f8947e4e",
+      "bytes": 65741
+    },
+    {
+      "p": "bin/aris-run.mjs",
+      "sha256": "9ef463f269b16ce9",
+      "bytes": 13311
+    },
+    {
+      "p": "bin/aris-status.mjs",
+      "sha256": "4dd09e05eb38799e",
+      "bytes": 30287
+    },
+    {
+      "p": "bin/aris-sync-lit.mjs",
+      "sha256": "aec350ac49616478",
+      "bytes": 5046
+    },
+    {
+      "p": "bin/aris.mjs",
+      "sha256": "2dd9618c3db5312a",
+      "bytes": 25519
+    },
+    {
+      "p": "bin/lib/aris-balance.mjs",
+      "sha256": "e3a5f58b106661cc",
+      "bytes": 4305
+    },
+    {
+      "p": "bin/lib/aris-control.mjs",
+      "sha256": "9724e4e941a76be4",
+      "bytes": 40092
+    },
+    {
+      "p": "bin/lib/aris-cost.mjs",
+      "sha256": "87489bb980e0a136",
+      "bytes": 5488
+    },
+    {
+      "p": "bin/lib/aris-dsh.mjs",
+      "sha256": "080d45e5c359bcc3",
+      "bytes": 7660
+    },
+    {
+      "p": "bin/lib/aris-events.mjs",
+      "sha256": "fde7560abb1783fe",
+      "bytes": 5467
+    },
+    {
+      "p": "bin/lib/aris-kimi.mjs",
+      "sha256": "7f6b404bc3c02fd4",
+      "bytes": 2433
+    },
+    {
+      "p": "bin/lib/aris-registry.mjs",
+      "sha256": "d7c614d5b4b20fb7",
+      "bytes": 11829
+    },
+    {
+      "p": "bin/lib/aris-runner.mjs",
+      "sha256": "a5a1765b077ebdbf",
+      "bytes": 51285
+    },
+    {
+      "p": "bin/lib/aris-state.mjs",
+      "sha256": "cc8aa6e4dc981b74",
+      "bytes": 17924
+    },
+    {
+      "p": "bin/lit-bibmerge.mjs",
+      "sha256": "eadc910be4c75ab9",
+      "bytes": 7584
+    },
+    {
+      "p": "bin/lit-gold.mjs",
+      "sha256": "03e5a353c8d28c13",
+      "bytes": 2803
+    },
+    {
+      "p": "bin/lit.mjs",
+      "sha256": "af05b02ccefc0bef",
+      "bytes": 109375
+    },
+    {
+      "p": "bin/model-worker.mjs",
+      "sha256": "40975f73677a9999",
+      "bytes": 7342
+    },
+    {
+      "p": "bin/paper-build.mjs",
+      "sha256": "e5e750378c1a5845",
+      "bytes": 11271
+    },
+    {
+      "p": "docs/ARIS-流水线与面板手册.md",
+      "sha256": "b824555968f86a62",
+      "bytes": 20432
+    },
+    {
+      "p": "LICENSE",
+      "sha256": "465269a40d410977",
+      "bytes": 1067
+    },
+    {
+      "p": "plugins/dsh-aris/client.js",
+      "sha256": "a2445085c92d3d96",
+      "bytes": 78068
+    },
+    {
+      "p": "plugins/dsh-aris/cordis.patch.yml",
+      "sha256": "fd8c70b8eb4d58ee",
+      "bytes": 55
+    },
+    {
+      "p": "plugins/dsh-aris/icon.svg",
+      "sha256": "2f23930ad49421c7",
+      "bytes": 404
+    },
+    {
+      "p": "plugins/dsh-aris/index.js",
+      "sha256": "eab1937afb06df8f",
+      "bytes": 39212
+    },
+    {
+      "p": "plugins/dsh-aris/lib/actions.mjs",
+      "sha256": "f518efaaee136aea",
+      "bytes": 8896
+    },
+    {
+      "p": "plugins/dsh-aris/lib/artifacts.mjs",
+      "sha256": "db3b7f308e76da71",
+      "bytes": 13026
+    },
+    {
+      "p": "plugins/dsh-aris/lib/collect.mjs",
+      "sha256": "b569b6298a201bf6",
+      "bytes": 10113
+    },
+    {
+      "p": "plugins/dsh-aris/lib/session-view.mjs",
+      "sha256": "e65d783e61e19524",
+      "bytes": 6307
+    },
+    {
+      "p": "plugins/dsh-aris/locale/en.json",
+      "sha256": "f9740b5f1840704f",
+      "bytes": 378
+    },
+    {
+      "p": "plugins/dsh-aris/locale/zh-CN.json",
+      "sha256": "fdc7dc845603950b",
+      "bytes": 432
+    },
+    {
+      "p": "plugins/dsh-aris/package.json",
+      "sha256": "ffcd127d0de7cc2f",
+      "bytes": 800
+    },
+    {
+      "p": "plugins/dsh-aris/README.md",
+      "sha256": "fa8ec8e000d66a93",
+      "bytes": 2481
+    },
+    {
+      "p": "README.md",
+      "sha256": "19aa651e120ec947",
+      "bytes": 14914
+    },
+    {
+      "p": "scripts/sanitize-rules.json",
+      "sha256": "63d0498e7c4198a9",
+      "bytes": 3939
+    },
+    {
+      "p": "scripts/sync.mjs",
+      "sha256": "5d88d14784e3c9f7",
+      "bytes": 10888
+    }
+  ]
+}
