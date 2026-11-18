@@ -261,6 +261,8 @@ Kimi 邮箱与 GPT 外审是同一件事的两条通道，所以放在一页，�
 - 事件流（`--json` 的逐条事件：`thread.started` / `item.completed` / `turn.completed` + usage）另存 `<项目>/.aris-run/codex/<时间>-<任务分类>.events.jsonl`，会话 id、命令执行、文件变更都从这里解析
 - 续聊提示（面板上就写着）：**不占**面板的 4 次/小时窗口，仍用你订阅的额度；提示词里的只读规则还在，但写操作不会被拦、也不会进项目审计日志
 - 因为 `--json` 模式下 stderr 不再打印 banner，`cliModel` 改从会话的 `session_meta` / `turn_context.model` 取，比模型自报可靠
+- **面板里能直接读会话**：最近调用与上次结果都有「查看会话」按钮，走 `codex.session` 动作读 rollout 文件，还原成「发给 GPT 的 / GPT 回复」两栏；harness 自己塞进去的上下文块（`<environment_context>`、`<skills_instructions>`、`You are Codex` 等）会被过滤掉，只留真正喂给审稿的那段。
+- **ChatGPT 桌面端侧栏不显示这些会话**：`codex exec` 生成的会话 `originator=codex_exec`、`source=exec`，桌面端只把它索引进自己的历史库（`thread_history_1.sqlite`），不写进 `thread-project-assignments` / `projectless-thread-ids`，所以「项目 / 最近」两个列表都不出现。想继续聊就用 `codex resume <id>`；要在桌面端看到，得改它的 `~/.codex/.codex-global-state.json` 归属记录（工作区外，需另行授权，且应用在跑时可能被覆盖）。
 
 **最近调用**：每次的时间/任务分类/模型/成败/tokens/耗时，带「续聊」按钮直接复制命令；明细在 `.dsh/codex-runs.jsonl`（字段 `task`、`sessionId`、`events`、`files`、`commands`、`changes`）。
 
@@ -503,6 +505,8 @@ python .dsh/skills/aris/tools/cx_verify.py --project <项目> --json
 | 送审文件被截断或漏送 | 单文件超 6 万字符会截断、超过 8 个文件会被丢 | 面板上次结果里有 `notes`；把材料拆开或分节送审 |
 | `tmp/codex-sandbox/` 里残留目录 | 上次跑完清理失败（文件被占用） | 手删该目录即可；`cleanCopy: false` 时本来就保留 |
 | 续聊里 GPT 改了文件 | `codex resume` 不受面板审计与只读闸门约束 | 续聊前想清楚；要审稿请走派单 |
+| ChatGPT 桌面端侧栏看不到派单会话 | exec 会话无项目归属，桌面端不登记进「最近」 | 面板「查看会话」看全文，或 `codex resume <id>` 续聊 |
+| 面板「查看会话」说找不到 rollout | 会话被清理，或 id 抄错/截断 | 用完整 UUID；`~/.codex/sessions` 只报体积不自动删 |
 | 事件流里 `thread.started` 有但没回复 | 进程超时被 kill | 调高「单次超时」或减小送审体积；看 `.events.jsonl` 末条 |
 | `--json` 模式下 `cliModel` 为空 | 会话文件还没落盘或 `~/.codex/sessions` 被清 | 面板会退回显示 `model`（派单时指定的那个） |
 

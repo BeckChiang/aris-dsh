@@ -30,6 +30,7 @@ import { resolveDsh } from './aris-dsh.mjs?v=46';
 import { CODEX_TASKS, codexState, listModels, normalizeWorkspace, previewPrompt, readCodexConfig, runCodexReview, saveCodexConfig } from './codex-review.mjs?v=4';
 import { readReviewRoute, routeBlocks, saveReviewRoute } from './review-route.mjs';
 import { collectReviewResults } from './review-results.mjs';
+import { readSessionTranscript } from './codex-session.mjs';
 
 const BIN_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -1057,6 +1058,13 @@ export async function control(workspace, name, input = {}, config = {}) {
     }
     case 'codex.run': {
       return startCodexRun(workspace, input || {});
+    }
+    case 'codex.session': {
+      // 把一条会话的 rollout 还原成对话：面板「查看会话」用，只读，不碰会话库。
+      const sid = String((input || {}).sessionId || '').trim();
+      if (!sid) return { ok: false, error: '缺少 sessionId' };
+      const t = readSessionTranscript(sid, { maxTurns: (input || {}).maxTurns });
+      return t.ok ? { ok: true, session: t } : { ok: false, error: t.error || '读取会话失败' };
     }
     case 'handoff.set': {
       const mode = String(input.mode || '') === 'kimi' ? 'kimi' : 'dsh';

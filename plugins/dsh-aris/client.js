@@ -681,6 +681,7 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
       const [wsMode, setWsMode] = React.useState(null);
       const [wsPath, setWsPath] = React.useState(null);
       const [copied, setCopied] = React.useState('');
+      const [view, setView] = React.useState(null);
       if (!codex) return h('div', { className: 'daris-empty' }, 'GPT 外审状态还没读到。');
       if (codex.error) return h('div', { className: 'daris-err' }, `GPT 外审状态读取失败：${codex.error}`);
       const c = draft || codex.config || {};
@@ -701,6 +702,29 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
         tasks[key] = { ...(tasks[key] || {}), ...patch };
         await save({ tasks });
       };
+      const openSession = async (sid) => {
+        if (!sid) return;
+        setView({ sessionId: sid, loading: true });
+        const r = await act('codex.session', { sessionId: sid });
+        setView(r && r.ok ? { sessionId: sid, data: r.session } : { sessionId: sid, err: (r && r.error) || '读取失败' });
+      };
+      const sessionPanel = view
+        ? h('div', { style: { marginTop: 10, padding: 10, background: 'rgba(0,0,0,0.03)', borderRadius: 8 } },
+          h('div', { className: 'daris-row' },
+            h('span', { className: 'daris-k' }, '会话回放'),
+            h('span', { className: 'daris-tag' }, view.sessionId),
+            h(Btn, { label: '关闭', onClick: () => setView(null) })),
+          view.loading ? h('div', { className: 'daris-tag', style: { marginTop: 6 } }, '正在读会话文件…') : null,
+          view.err ? h('div', { className: 'daris-err', style: { marginTop: 6 } }, view.err) : null,
+          (view.data) ? h('div', { style: { marginTop: 6 } },
+            h('div', { className: 'daris-path' }, `${view.data.file || ''}`),
+            h('div', { className: 'daris-tag', style: { marginTop: 4 } },
+              `模型 ${(view.data.meta || {}).model || '?'} · 起源 ${(view.data.meta || {}).originator || '?'} · 工作区 ${(view.data.meta || {}).cwd || '?'} · ${view.data.total || 0} 条消息`),
+            (view.data.dropped ? h('div', { className: 'daris-tag', style: { marginTop: 4 } }, `只显示最近 ${(view.data.turns || []).length} 条，更早的 ${view.data.dropped} 条未展开`) : null),
+            (view.data.turns || []).map((t, i) => h('div', { key: i, style: { marginTop: 8 } },
+              h('div', { className: 'daris-k' }, t.role === 'user' ? '发给 GPT 的' : 'GPT 回复'),
+              h('pre', { className: 'daris-pre', style: { maxHeight: 320, overflow: 'auto', marginTop: 4 } }, t.text)))) : null)
+        : null;
       const manual = codex.manual || {};
       const last = codex.lastManual || null;
       const pp = codex.promptPreview || {};
@@ -828,6 +852,7 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
                 h('div', { className: 'daris-row' },
                   h(Btn, { label: '复制续聊命令', onClick: () => copy(`codex resume ${last.sessionId}`) }),
                   h(Btn, { label: '复制会话 id', onClick: () => copy(last.sessionId) }),
+                  h(Btn, { label: '查看会话', onClick: () => openSession(last.sessionId) }),
                   h('span', { className: 'daris-tag' }, last.sessionId)),
                 copied ? h('pre', { className: 'daris-pre', style: { marginTop: 6 } }, copied) : null,
                 h('div', { className: 'daris-tag', style: { marginTop: 6 } }, '续聊提示：不占面板的 4 次/小时窗口，仍用你订阅的额度；提示词里的只读规则还在，但写操作不会被拦、也不会进项目审计日志。')) : null,
@@ -851,7 +876,8 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
               taskDefs.map((d) => h('option', { key: d.key, value: d.key }, d.label))),
             h(Btn, { label: manual.running ? '正在审…' : '派单', primary: true, success: !manual.running, disabled: busy || manual.running || !root || !filesText.trim(), onClick: () => act('codex.run', { root, files: filesText, task: taskKey }) })),
           manual.running ? h('div', { className: 'daris-tag', style: { marginTop: 8 } }, `进行中：${manual.target} · ${manual.task || '-'} · 起于 ${ft(manual.at)}`) : null,
-          lastBlock));
+          lastBlock,
+          sessionPanel));
 
       const recentRows = (codex.recent || []).map((r, i) => h('div', { key: i, className: 'daris-row', style: { marginTop: 6 } },
         h('span', { className: 'daris-tag' }, ft(r.at)),
@@ -861,13 +887,14 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
         h('span', { className: 'daris-tag' }, `${r.tokens || 0} tok`),
         h('span', { className: 'daris-tag' }, `${Math.round((r.ms || 0) / 1000)}s`),
         r.sessionId ? h(Btn, { label: '续聊', onClick: () => copy(`codex resume ${r.sessionId}`) }) : null,
+        r.sessionId ? h(Btn, { label: '查看会话', onClick: () => openSession(r.sessionId) }) : null,
         r.ok ? null : h('span', { className: 'daris-err' }, String(r.error || '').slice(0, 120))));
 
       const g6 = h(Group, {
         title: '最近调用 · 每次谁审的',
         sub: '明细在 .dsh/codex-runs.jsonl（耗时、tokens、CLI 实际模型、会话 id、成败）；事件流在 <项目>/.aris-run/codex/*.events.jsonl。',
         badge: `${(codex.recent || []).length} 条`,
-      }, h('div', null, recentRows.length ? recentRows : h('div', { className: 'daris-tag', style: { marginTop: 6 } }, '还没有调用记录。')));
+      }, h('div', null, recentRows.length ? recentRows : h('div', { className: 'daris-tag', style: { marginTop: 6 } }, '还没有调用记录。')), sessionPanel);
 
       const g7 = h(Group, { title: '说明 · 两条不可信与只读三层' },
         h('div', { className: 'daris-sub' }, '模型清单读自本机 codex 的 models_cache.json，钉死的型号消失时会拒单而不是静默回退。模型自报身份不可信（实测 -m gpt-6-luna 却自报 gpt-6.2-sol），以 CLI 会话里的 turn_context.model 为准。只读靠三层：提示词硬规则（软约束）、送审文件隔离副本（物理隔离）、派单后扫命令与文件变更（事后审计）。'));
