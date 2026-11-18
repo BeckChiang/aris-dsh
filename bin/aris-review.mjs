@@ -85,6 +85,7 @@ const USAGE = `用法: node bin/aris-review.mjs --project <dir> --target <file.m
                          （可重复；只列路径与大小，不嵌入正文）
   --purge-trash [天数]   清空 <mailbox>/trash/ 里超过 N 天（默认 30）的归档，缺省不动
                          入账成功的请求/回复会被自动移到 trash/<base>/，不再留在 in/out
+  --via <name>           覆盖 reviewers[].via：direct | kimi-mailbox | codex
   --gate <name>          GPT 外审环节名（via=codex 时决定默认模型/强度），默认 S6_writing
   --effort <level>       GPT 外审思考强度单次覆盖（low|medium|high|xhigh|max|ultra）
   --slots                只列出 reviewer.json 里配好的审查者（slot / via / 后端）后退出
@@ -225,10 +226,11 @@ function resolveConfig(args) {
       sources[k] = `reviewers[slot=${picked.slot ?? '?'}]`;
     }
     cfg.via = String(picked.via || 'direct').toLowerCase();
+    if (args.via) { cfg.via = String(args.via).toLowerCase(); sources.via = '命令行'; }
     cfg.reviewerLabel = picked.label || picked.id || picked.name || `slot${picked.slot ?? cfg.slot}`;
     cfg.modelHint = picked.model_hint ?? picked.modelHint ?? '';
   } else {
-    cfg.via = 'direct';
+    cfg.via = args.via ? String(args.via).toLowerCase() : 'direct';
     cfg.reviewerLabel = `slot${cfg.slot}`;
   }
 
