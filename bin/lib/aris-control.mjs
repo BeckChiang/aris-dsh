@@ -27,7 +27,8 @@ import {
 } from './aris-registry.mjs?v=46';
 import { costView, effectiveInterval, isRunning, kimiIntervalMinutes, nextKimiTick, nextRunAt, pendingReviews, pendingSubmittedAt, preflight, recoverStale, resetPrompt, runOnce, cancelStopIntent, stopPipeline, tick, todayStats } from './aris-runner.mjs?v=47';
 import { resolveDsh } from './aris-dsh.mjs?v=46';
-import { CODEX_TASKS, codexState, listModels, readCodexConfig, runCodexReview, saveCodexConfig } from './codex-review.mjs?v=2';
+import { CODEX_TASKS, codexState, listModels, readCodexConfig, runCodexReview, saveCodexConfig } from './codex-review.mjs?v=3';
+import { readReviewRoute, routeBlocks, saveReviewRoute } from './review-route.mjs';
 
 const BIN_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -558,6 +559,7 @@ function codexSnapshot(workspace) {
   const taskDefs = CODEX_TASKS.map((t) => ({ key: t.key, label: t.label, hint: t.hint }));
   return {
     ...base,
+    route: readReviewRoute(workspace),
     taskDefs,
     stageDefs: taskDefs, // 旧名兼容
     manual: codexManual,
@@ -567,6 +569,8 @@ function codexSnapshot(workspace) {
 
 function startCodexRun(workspace, input) {
   if (codexManual.running) return { ok: false, error: '已有一次手动外审在跑，等它结束' };
+  const routeBlocked = routeBlocks(workspace, 'gpt');
+  if (routeBlocked) return { ok: false, blocked: true, error: routeBlocked };
   const taskKey = String(input.task || input.taskKey || input.gate || 'routine_review');
   const root = path.resolve(String(input.root || ''));
   if (!existsDir(root)) return { ok: false, error: `项目目录不存在：${root}` };
@@ -902,6 +906,10 @@ export async function control(workspace, name, input = {}, config = {}) {
       const patch = input.codex || input;
       saveCodexConfig(workspace, patch && typeof patch === 'object' ? patch : {});
       return { ok: true, codex: codexSnapshot(workspace), saved: readCodexConfig(workspace) };
+    }
+    case 'review.route': {
+      const saved = saveReviewRoute(workspace, (input || {}).channel);
+      return { ok: true, route: saved, dashboard: snapshot(workspace) };
     }
     case 'codex.run': {
       return startCodexRun(workspace, input || {});

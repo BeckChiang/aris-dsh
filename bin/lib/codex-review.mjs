@@ -8,6 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { acquireReviewLock, inspectReviewLock, releaseReviewLock, reviewLockFile } from './review-lock.mjs';
+import { readReviewRoute, routeBlocks } from './review-route.mjs';
 
 export const CODEX_HOME = path.join(os.homedir(), '.codex');
 const WINDOW_MS = 60 * 60 * 1000;
@@ -323,6 +324,8 @@ export async function runCodexReview(input) {
   const taskKey = String(input.taskKey || input.gate || 'routine_review');
   const cfg = readCodexConfig(workspace);
   if (!cfg.enabled) return { ok: false, skipped: true, error: 'GPT 外审未启用（面板「审核」开关）' };
+  const blocked = routeBlocks(workspace, 'gpt');
+  if (blocked) return { ok: false, blocked: true, error: blocked };
   const pick = cfg.tasks[taskKey] || { model: 'gpt-6.2-sol', effort: 'medium', enabled: true };
   if (pick.enabled === false) return { ok: false, skipped: true, error: `任务分类 ${taskKey} 未启用 GPT 外审` };
   const model = String(input.model || pick.model);
@@ -517,6 +520,7 @@ export function codexState(workspace) {
   }
   const taskDefs = CODEX_TASKS.map((t) => ({ key: t.key, label: t.label, hint: t.hint }));
   return {
+    route: readReviewRoute(workspace),
     config: cfg,
     taskDefs,
     stageDefs: taskDefs, // 旧名兼容

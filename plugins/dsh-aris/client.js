@@ -551,6 +551,47 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
       return props.value ? h('span', { className: props.err ? 'daris-err' : 'daris-warn' }, props.value) : null;
     }
 
+    // 折叠分组：审核页的每一项设置都归到一条「路径」下，默认收起
+    function Group(props) {
+      const { title, sub, badge, defaultOpen, children } = props;
+      const [open, setOpen] = React.useState(Boolean(defaultOpen));
+      return h('div', { className: 'daris-card' },
+        h('div', { className: 'daris-row', style: { justifyContent: 'space-between', cursor: 'pointer', alignItems: 'flex-start' }, onClick: () => setOpen(!open) },
+          h('div', { style: { flex: 1, minWidth: 0 } },
+            h('div', { className: 'daris-name' }, `${open ? '▾' : '▸'} ${title}`),
+            sub ? h('div', { className: 'daris-sub' }, sub) : null),
+          badge ? h('span', { className: 'daris-tag' }, badge) : null),
+        open ? h('div', { style: { marginTop: 8 } }, children) : null);
+    }
+
+    // 审核线路：明确选一条，另一条会被闸门挡住
+    function RouteCard(props) {
+      const { codex, busy, act } = props;
+      const route = (codex && codex.route) || { channel: 'auto', options: [] };
+      const opts = route.options && route.options.length ? route.options : [
+        { value: 'auto', label: '自动（谁先占锁谁跑）', hint: '' },
+        { value: 'kimi', label: 'Kimi 邮箱', hint: '' },
+        { value: 'gpt', label: 'GPT 外审', hint: '' },
+      ];
+      const cur = opts.find((o) => o.value === route.channel) || opts[0];
+      return h(Group, {
+        title: '审核线路 · 这一轮走哪条通道',
+        sub: '选定后另一条通道的派单/投递会被直接拒绝；两条都开放就是「自动」，靠审核单飞锁互斥。',
+        badge: cur.label,
+        defaultOpen: true,
+      },
+        h('div', null,
+          h('div', { className: 'daris-row', style: { marginTop: 4 } },
+            opts.map((o) => h(Btn, {
+              key: o.value,
+              label: o.label,
+              primary: o.value === route.channel,
+              disabled: busy,
+              onClick: () => act('review.route', { channel: o.value }),
+            }))),
+          h('div', { className: 'daris-sub', style: { marginTop: 8 } }, cur.hint || '')));
+    }
+
     function GptReviewCards(props) {
       const { codex, pipes, busy, act } = props;
       const [draft, setDraft] = React.useState(null);
@@ -588,27 +629,32 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
           h('option', { value: 'read-only' }, 'read-only（只读正文）'),
           h('option', { value: 'danger-full-access' }, 'full-access（可翻仓库）'))));
       return h('div', null,
-        h('div', { className: 'daris-card' },
-          h('div', { className: 'daris-name' }, 'GPT 外审通道'),
-          h('div', { className: 'daris-sub' }, '直接调本机 ChatGPT 桌面端绑定的 Codex CLI（订阅登录，不另付费）。额度是订阅共享的，所以闸门在派单前生效：超限直接拒绝，不静默降级。'),
-          h('div', { className: 'daris-row', style: { marginTop: 10 } },
-            h(Btn, { label: c.enabled ? '已启用 · 点击停用' : '未启用 · 点击启用', primary: !c.enabled, danger: c.enabled, disabled: busy, onClick: () => save({ enabled: !c.enabled }) }),
-            h('span', { className: 'daris-tag' }, codex.exeOk ? 'codex.exe 已找到' : 'codex.exe 未找到'),
-            h('span', { className: 'daris-tag' }, `本小时 ${codex.usedThisHour}/${c.hourlyLimit}`),
-            h('span', { className: 'daris-tag' }, `今日 ${codex.todayCount}${Number(c.dailyLimit) > 0 ? '/' + c.dailyLimit : '（不限）'}`),
-            Number(codex.consecutiveFailures) > 0 ? h('span', { className: 'daris-tag' }, `连续失败 ${codex.consecutiveFailures}/3`) : null),
-          h('div', { className: 'daris-path', style: { marginTop: 6 } }, codex.exe || '（未解析到 codex.exe）'),
-          nums,
-          h('div', { className: 'daris-row', style: { marginTop: 10 } },
-            h(Btn, { label: '保存通道设置', primary: true, disabled: busy, onClick: () => save({ hourlyLimit: Number(c.hourlyLimit) || 4, dailyLimit: Number(c.dailyLimit) || 0, timeoutMinutes: Number(c.timeoutMinutes) || 8, proxy: String(c.proxy || ''), sandboxMode: c.sandboxMode || 'read-only' }) })),
-          h('div', { className: 'daris-tag', style: { marginTop: 8 } },
-            c.sandboxMode === 'danger-full-access'
-              ? 'full-access：GPT 可以自己执行命令翻仓库，也可能误改文件。'
-              : 'read-only：这台机上 codex 的只读 shell 辅助进程起不来（orchestrator_helper_exit_nonzero），所以 GPT 只读消息正文，不会去翻文件。')),
-        h('div', { className: 'daris-card' },
-          h('div', { className: 'daris-name' }, '任务分类 → 模型'),
-          h('div', { className: 'daris-sub' }, '按「这一单要审什么」配默认模型与思考强度，不绑流水线阶段（阶段会变，任务类型稳定）。单次覆盖见派单卡；复现请按原配置重跑。'),
-          taskDefs.map((def) => {
+        h(Group, {
+          title: 'GPT 外审通道 · 开关与额度',
+          sub: '本机 ChatGPT 桌面端的 Codex CLI（订阅登录，不另付费）。额度共用订阅，所以闸门在派单前生效：超限直接拒，不静默降级。',
+          badge: c.enabled ? '已启用' : '未启用',
+        },
+          h('div', null,
+            h('div', { className: 'daris-row', style: { marginTop: 8 } },
+              h(Btn, { label: c.enabled ? '已启用 · 点击停用' : '未启用 · 点击启用', primary: !c.enabled, danger: c.enabled, disabled: busy, onClick: () => save({ enabled: !c.enabled }) }),
+              h('span', { className: 'daris-tag' }, codex.exeOk ? 'codex.exe 已找到' : 'codex.exe 未找到'),
+              h('span', { className: 'daris-tag' }, `本小时 ${codex.usedThisHour}/${c.hourlyLimit}`),
+              h('span', { className: 'daris-tag' }, `今日 ${codex.todayCount}${Number(c.dailyLimit) > 0 ? '/' + c.dailyLimit : '（不限）'}`),
+              Number(codex.consecutiveFailures) > 0 ? h('span', { className: 'daris-tag' }, `连续失败 ${codex.consecutiveFailures}/3`) : null),
+            h('div', { className: 'daris-path', style: { marginTop: 6 } }, codex.exe || '（未解析到 codex.exe）'),
+            nums,
+            h('div', { className: 'daris-row', style: { marginTop: 10 } },
+              h(Btn, { label: '保存通道设置', primary: true, disabled: busy, onClick: () => save({ hourlyLimit: Number(c.hourlyLimit) || 4, dailyLimit: Number(c.dailyLimit) || 0, timeoutMinutes: Number(c.timeoutMinutes) || 8, proxy: String(c.proxy || ''), sandboxMode: c.sandboxMode || 'read-only' }) })),
+            h('div', { className: 'daris-tag', style: { marginTop: 8 } },
+              c.sandboxMode === 'danger-full-access'
+                ? 'full-access：GPT 可以自己执行命令翻仓库，也可能误改文件。'
+                : 'read-only：这台机上 codex 的只读 shell 辅助进程起不来（orchestrator_helper_exit_nonzero），所以 GPT 只读消息正文，不会去翻文件。'))),
+        h(Group, {
+          title: 'GPT 任务分类 · 每类用哪个模型',
+          sub: '按「这一单要审什么」配默认模型与思考强度，不绑流水线阶段（阶段会变，任务类型稳定）。',
+          badge: `${taskDefs.length} 类`,
+        },
+          h('div', null, taskDefs.map((def) => {
             const st = (c.tasks || {})[def.key] || {};
             const slug = st.model || '';
             return h('div', { key: def.key, className: 'daris-row', style: { marginTop: 6 } },
@@ -620,45 +666,51 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
               h('select', { className: 'daris-input daris-num', value: st.effort || '', onChange: (e) => saveTask(def.key, { effort: e.target.value }) },
                 effortsOf(slug).map((x) => h('option', { key: x, value: x }, x))),
               h(Btn, { label: st.enabled === false ? '关' : '开', disabled: busy, onClick: () => saveTask(def.key, { enabled: st.enabled === false }) }));
-          })),
-        h('div', { className: 'daris-card' },
-          h('div', { className: 'daris-name' }, '手动派单'),
-          h('div', { className: 'daris-sub' }, '挑一条流水线的根目录和一份目标文件，立刻让 GPT 外审跑一次（同样受小时额度与超时约束，结果落到 <项目>/.aris/reviews/）。'),
-          h('div', { className: 'daris-row', style: { marginTop: 10 } },
-            h('select', { className: 'daris-input', value: root, onChange: (e) => setRoot(e.target.value) },
-              h('option', { value: '' }, '选择流水线…'),
-              (pipes || []).map((p) => h('option', { key: p.root, value: p.root }, p.name))),
-            h('input', { className: 'daris-input daris-grow', placeholder: '目标文件（相对项目根），例如 paper/main.md', value: target, onChange: (e) => setTarget(e.target.value) })),
-          h('div', { className: 'daris-row', style: { marginTop: 8 } },
-            h('select', { className: 'daris-input', value: taskKey, onChange: (e) => setTaskKey(e.target.value) },
-              taskDefs.map((d) => h('option', { key: d.key, value: d.key }, d.label))),
-            h(Btn, { label: manual.running ? '正在审…' : '派单', primary: true, disabled: busy || manual.running || !root || !target.trim(), onClick: () => act('codex.run', { root, target: target.trim(), gate }) })),
-          manual.running ? h('div', { className: 'daris-tag', style: { marginTop: 8 } }, `进行中：${manual.target} · ${manual.gate} · 起于 ${ft(manual.at)}`) : null,
-          last
-            ? h('div', { style: { marginTop: 10 } },
-              h('div', { className: 'daris-k' }, `${last.ok ? '上次派单' : '上次失败'} · ${last.target} · ${last.task || '-'} · ${ft(last.at)}`),
-              last.ok
-                ? h('div', null,
-                  h('div', { className: 'daris-tag', style: { marginTop: 6 } }, `模型 ${last.cliModel || last.model} / ${last.effort} · ${last.tokens} tokens · ${Math.round((last.ms || 0) / 1000)}s · verdict ${last.verdict || 'unknown'}`),
-                  last.file ? h('div', { className: 'daris-path' }, last.file) : null,
-                  h('pre', { className: 'daris-pre' }, String(last.reply || '').slice(0, 1500)))
-                : h('div', { className: 'daris-err' }, String(last.error || '')))
-            : null),
-        h('div', { className: 'daris-card' },
-          h('div', { className: 'daris-name' }, `最近调用 · ${(codex.recent || []).length}`),
-          (codex.recent || []).length
-            ? (codex.recent || []).map((r, i) => h('div', { key: i, className: 'daris-row', style: { marginTop: 6 } },
-              h('span', { className: 'daris-tag' }, ft(r.at)),
-              h('span', { className: 'daris-tag' }, r.task || r.gate || '-'),
-              h('span', { className: 'daris-tag' }, `${r.cliModel || r.model}/${r.effort}`),
-              h('span', { className: 'daris-tag' }, r.ok ? 'ok' : 'fail'),
-              h('span', { className: 'daris-tag' }, `${r.tokens || 0} tok`),
-              h('span', { className: 'daris-tag' }, `${Math.round((r.ms || 0) / 1000)}s`),
-              r.ok ? null : h('span', { className: 'daris-err' }, String(r.error || '').slice(0, 120))))
-            : h('div', { className: 'daris-tag', style: { marginTop: 6 } }, '还没有调用记录。')),
-        h('div', { className: 'daris-card' },
-          h('div', { className: 'daris-name' }, '说明'),
-          h('div', { className: 'daris-sub' }, '模型清单读自本机 codex 的 models_cache.json，钉死的型号消失时会拒单而不是静默回退。每次调用都记到 .dsh/codex-runs.jsonl（耗时、tokens、实际模型、成败），面板与外部脚本都能查。')));
+          }))),
+        h(Group, {
+          title: '手动派单 · 选文件与任务分类',
+          sub: '挑一条流水线的根目录和一份目标文件，立刻让 GPT 外审跑一次（受小时额度、超时与审核锁约束，结果落到 <项目>/.aris/reviews/）。',
+          badge: manual.running ? '进行中' : '',
+        },
+          h('div', null,
+            h('div', { className: 'daris-row', style: { marginTop: 10 } },
+              h('select', { className: 'daris-input', value: root, onChange: (e) => setRoot(e.target.value) },
+                h('option', { value: '' }, '选择流水线…'),
+                (pipes || []).map((p) => h('option', { key: p.root, value: p.root }, p.name))),
+              h('input', { className: 'daris-input daris-grow', placeholder: '目标文件（相对项目根），例如 paper/main.md', value: target, onChange: (e) => setTarget(e.target.value) })),
+            h('div', { className: 'daris-row', style: { marginTop: 8 } },
+              h('select', { className: 'daris-input', value: taskKey, onChange: (e) => setTaskKey(e.target.value) },
+                taskDefs.map((d) => h('option', { key: d.key, value: d.key }, d.label))),
+              h(Btn, { label: manual.running ? '正在审…' : '派单', primary: true, disabled: busy || manual.running || !root || !target.trim(), onClick: () => act('codex.run', { root, target: target.trim(), task: taskKey }) })),
+            manual.running ? h('div', { className: 'daris-tag', style: { marginTop: 8 } }, `进行中：${manual.target} · ${manual.task || '-'} · 起于 ${ft(manual.at)}`) : null,
+            last
+              ? h('div', { style: { marginTop: 10 } },
+                h('div', { className: 'daris-k' }, `${last.ok ? '上次派单' : '上次失败'} · ${last.target} · ${last.task || '-'} · ${ft(last.at)}`),
+                last.ok
+                  ? h('div', null,
+                    h('div', { className: 'daris-tag', style: { marginTop: 6 } }, `模型 ${last.cliModel || last.model} / ${last.effort} · ${last.tokens} tokens · ${Math.round((last.ms || 0) / 1000)}s · verdict ${last.verdict || 'unknown'}`),
+                    last.file ? h('div', { className: 'daris-path' }, last.file) : null,
+                    h('pre', { className: 'daris-pre' }, String(last.reply || '').slice(0, 1500)))
+                  : h('div', { className: 'daris-err' }, String(last.error || '')))
+              : null)),
+        h(Group, {
+          title: '最近调用 · 每次谁审的',
+          sub: '明细在 .dsh/codex-runs.jsonl（耗时、tokens、CLI 实际模型、成败）。',
+          badge: `${(codex.recent || []).length} 条`,
+        },
+          h('div', null,
+            (codex.recent || []).length
+              ? (codex.recent || []).map((r, i) => h('div', { key: i, className: 'daris-row', style: { marginTop: 6 } },
+                h('span', { className: 'daris-tag' }, ft(r.at)),
+                h('span', { className: 'daris-tag' }, r.task || r.gate || '-'),
+                h('span', { className: 'daris-tag' }, `${r.cliModel || r.model}/${r.effort}`),
+                h('span', { className: 'daris-tag' }, r.ok ? 'ok' : 'fail'),
+                h('span', { className: 'daris-tag' }, `${r.tokens || 0} tok`),
+                h('span', { className: 'daris-tag' }, `${Math.round((r.ms || 0) / 1000)}s`),
+                r.ok ? null : h('span', { className: 'daris-err' }, String(r.error || '').slice(0, 120))))
+              : h('div', { className: 'daris-tag', style: { marginTop: 6 } }, '还没有调用记录。'))),
+        h(Group, { title: '说明 · 两条不可信与沙箱' },
+          h('div', { className: 'daris-sub' }, '模型清单读自本机 codex 的 models_cache.json，钉死的型号消失时会拒单而不是静默回退。模型自报身份不可信（实测 -m gpt-6-luna 却自报 gpt-6.2-sol），以 CLI 首行 model: 为准。')));
     }
 
     function ArisPanel() {
@@ -1079,52 +1131,62 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
         body = h(ArtifactsTab, { pipes });
       } else if (tab === 'review') {
         const lock = (data.codex && data.codex.lock) || {};
+        const lockTag = lock.locked && !lock.expired
+          ? `运行中：${lock.channel} · ${lock.task || '-'} · ${lock.target || '-'}`
+          : '当前空闲';
         body = h('div', null,
-          h('div', { className: 'daris-card' },
-            h('div', { className: 'daris-name' }, '审核通道'),
-            h('div', { className: 'daris-sub' }, 'Kimi 邮箱与 GPT 外审共用一条单飞规则：同一时刻只允许一次审核在跑，防止两条通道同时改同一份稿。'),
-            h('div', { className: 'daris-row', style: { marginTop: 10 } },
-              h('span', { className: 'daris-tag' }, lock.locked && !lock.expired
-                ? `运行中：${lock.channel} · ${lock.task || '-'} · ${lock.target || '-'}`
-                : '当前空闲'),
-              lock.locked && !lock.expired && lock.ageMs
-                ? h('span', { className: 'daris-tag' }, `${Math.round(lock.ageMs / 60000)} 分钟前开始`)
-                : null,
-              h('span', { className: 'daris-tag' }, 'Kimi：投递占锁、收件解锁；GPT：派单占锁、跑完解锁'))),
-          h('div', { className: 'daris-card' },
-            h('div', { className: 'daris-name' }, '执行权'),
-            h('div', { className: 'daris-sub' }, '同一时刻只能有一方执行。交回 Kimi 时会先停掉本机所有流水线，DSH 只保留收件。'),
-            h('div', { className: 'daris-row', style: { marginTop: 10 } },
-              h(Btn, { label: 'DSH 接管', primary: ho.mode === 'dsh', disabled: busy, onClick: () => act('handoff.set', { mode: 'dsh' }) }),
-              h(Btn, { label: '交回 Kimi Work', primary: ho.mode === 'kimi', disabled: busy, onClick: () => act('handoff.set', { mode: 'kimi' }) }),
-              h('span', { className: 'daris-tag' }, ho.at ? `最近切换 ${ft(ho.at)}` : '尚未切换过'))),
-          h('div', { className: 'daris-card' },
-            h('div', { className: 'daris-name' }, `邮箱 · 待处理 ${mb.pending}`),
-            h('div', { className: 'daris-path' }, mb.path || '未配置'),
-            mb.items && mb.items.length
-              ? h('ul', { style: { margin: '8px 0 0 18px', padding: 0 } }, mb.items.map((it, i) => h('li', { key: i }, it.text)))
-              : h('div', { className: 'daris-tag', style: { marginTop: 6 } }, mb.exists ? '没有待处理请求' : '邮箱目录不存在'),
-            h('div', { className: 'daris-row', style: { marginTop: 10 } }, h(Btn, { label: '立即收件', disabled: busy, onClick: () => act('mailbox.collect') }))),
-          h('div', { className: 'daris-card' },
-            h('div', { className: 'daris-name' }, 'Kimi 定时任务节奏'),
-            h('div', { className: 'daris-sub' }, '填 Kimi automation 里实际配置的周期与开始时刻：DSH 按 2 倍周期起跑（保证取件快于生成），并把起跑相位错开半个周期，避免和 Kimi 撞在同一分钟。'),
-            h('div', { className: 'daris-row', style: { marginTop: 10 } },
-              h('input', { className: 'daris-input daris-num', type: 'number', value: kimiMin, onChange: (e) => setKimiMin(e.target.value) }),
-              h('span', { className: 'daris-tag' }, '分钟'),
-              h('input', { className: 'daris-input daris-num', type: 'time', step: 60, value: kimiStart, onChange: (e) => setKimiStart(e.target.value) }),
-              h('span', { className: 'daris-tag' }, '首次取件时刻'),
-              h(Btn, { label: '保存', primary: true, disabled: busy, onClick: () => act('settings.save', { settings: { kimi: { intervalMinutes: Number(kimiMin) || 0, startTime: kimiStart.trim() } } }) })),
-            h('div', { className: 'daris-tag', style: { marginTop: 8 } }, kimiWorst)),
-          h('div', { className: 'daris-card' },
-            h('div', { className: 'daris-name' }, 'Kimi 取件提示词'),
-            h('div', { className: 'daris-sub' }, '生成后整段贴进 Kimi Work 的定时任务；邮箱地址与唤醒间隔已按当前设置填好。规则是一轮只取一条，剩下的留到下次唤醒。'),
-            h('div', { className: 'daris-row', style: { marginTop: 10 } },
-              h(Btn, { label: kimiPrompt ? '重新生成' : '生成提示词', primary: true, disabled: busy, onClick: loadKimiPrompt }),
-              kimiPrompt ? h(Btn, { label: '复制', disabled: busy, onClick: copyKimiPrompt }) : null,
-              kimiPrompt ? h(Btn, { label: '存到文件', disabled: busy, onClick: saveKimiPrompt }) : null),
-            kimiPrompt
-              ? h('textarea', { className: 'daris-input', style: { marginTop: 10, minHeight: 260, fontFamily: 'ui-monospace, SFMono-Regular, Consolas, monospace', fontSize: 12, lineHeight: 1.6 }, value: kimiPrompt, readOnly: true })
-              : null),
+          h(RouteCard, { codex: data.codex, busy, act }),
+          h(Group, {
+            title: '审核锁 · 同一时刻只跑一条',
+            sub: 'Kimi 投递占锁、收件解锁；GPT 派单占锁、跑完解锁。锁没放掉之前，另一个通道的派单会被直接拒绝。',
+            badge: lockTag,
+            defaultOpen: false,
+          },
+            h('div', null,
+              h('div', { className: 'daris-row', style: { marginTop: 8 } },
+                h('span', { className: 'daris-tag' }, lockTag),
+                lock.locked && !lock.expired && lock.ageMs
+                  ? h('span', { className: 'daris-tag' }, `${Math.round(lock.ageMs / 60000)} 分钟前开始`)
+                  : null),
+              lock.file ? h('div', { className: 'daris-path', style: { marginTop: 6 } }, lock.file) : null)),
+          h(Group, {
+            title: 'Kimi 邮箱通道 · 投递与取件',
+            sub: '子进程把请求写进 in/，Kimi 客户端定时取件作答，回复落 out/，DSH 再收件入账。',
+            badge: `待处理 ${mb.pending}`,
+            defaultOpen: false,
+          },
+            h('div', null,
+              h('div', { className: 'daris-k', style: { marginTop: 4 } }, '执行权'),
+              h('div', { className: 'daris-sub' }, '同一时刻只能有一方执行。交回 Kimi 时会先停掉本机所有流水线，DSH 只保留收件。'),
+              h('div', { className: 'daris-row', style: { marginTop: 8 } },
+                h(Btn, { label: 'DSH 接管', primary: ho.mode === 'dsh', disabled: busy, onClick: () => act('handoff.set', { mode: 'dsh' }) }),
+                h(Btn, { label: '交回 Kimi Work', primary: ho.mode === 'kimi', disabled: busy, onClick: () => act('handoff.set', { mode: 'kimi' }) }),
+                h('span', { className: 'daris-tag' }, ho.at ? `最近切换 ${ft(ho.at)}` : '尚未切换过')),
+              h('div', { className: 'daris-k', style: { marginTop: 14 } }, `邮箱 · 待处理 ${mb.pending}`),
+              h('div', { className: 'daris-path' }, mb.path || '未配置'),
+              mb.items && mb.items.length
+                ? h('ul', { style: { margin: '8px 0 0 18px', padding: 0 } }, mb.items.map((it, i) => h('li', { key: i }, it.text)))
+                : h('div', { className: 'daris-tag', style: { marginTop: 6 } }, mb.exists ? '没有待处理请求' : '邮箱目录不存在'),
+              h('div', { className: 'daris-row', style: { marginTop: 8 } },
+                h(Btn, { label: '立即收件', disabled: busy, onClick: () => act('mailbox.collect') })),
+              h('div', { className: 'daris-k', style: { marginTop: 14 } }, '取件节奏'),
+              h('div', { className: 'daris-sub' }, '填 Kimi automation 里实际配置的周期与开始时刻：DSH 按 2 倍周期起跑（保证取件快于生成），并把起跑相位错开半个周期，避免和 Kimi 撞在同一分钟。'),
+              h('div', { className: 'daris-row', style: { marginTop: 8 } },
+                h('input', { className: 'daris-input daris-num', type: 'number', value: kimiMin, onChange: (e) => setKimiMin(e.target.value) }),
+                h('span', { className: 'daris-tag' }, '分钟'),
+                h('input', { className: 'daris-input daris-num', type: 'time', step: 60, value: kimiStart, onChange: (e) => setKimiStart(e.target.value) }),
+                h('span', { className: 'daris-tag' }, '首次取件时刻'),
+                h(Btn, { label: '保存', primary: true, disabled: busy, onClick: () => act('settings.save', { settings: { kimi: { intervalMinutes: Number(kimiMin) || 0, startTime: kimiStart.trim() } } }) })),
+              h('div', { className: 'daris-tag', style: { marginTop: 8 } }, kimiWorst),
+              h('div', { className: 'daris-k', style: { marginTop: 14 } }, '取件提示词'),
+              h('div', { className: 'daris-sub' }, '生成后整段贴进 Kimi Work 的定时任务；邮箱地址与唤醒间隔已按当前设置填好。规则是一轮只取一条，剩下的留到下次唤醒。'),
+              h('div', { className: 'daris-row', style: { marginTop: 8 } },
+                h(Btn, { label: kimiPrompt ? '重新生成' : '生成提示词', primary: true, disabled: busy, onClick: loadKimiPrompt }),
+                kimiPrompt ? h(Btn, { label: '复制', disabled: busy, onClick: copyKimiPrompt }) : null,
+                kimiPrompt ? h(Btn, { label: '存到文件', disabled: busy, onClick: saveKimiPrompt }) : null),
+              kimiPrompt
+                ? h('textarea', { className: 'daris-input', style: { marginTop: 10, minHeight: 260, fontFamily: 'ui-monospace, SFMono-Regular, Consolas, monospace', fontSize: 12, lineHeight: 1.6 }, value: kimiPrompt, readOnly: true })
+                : null)),
           h(GptReviewCards, { codex: data.codex, pipes, busy, act }));
       } else {
         const f = form || { mailbox: '', model: 'deepseek-flash', maxConcurrent: '3', maxMinutes: '120' };

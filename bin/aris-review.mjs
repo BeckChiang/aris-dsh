@@ -47,6 +47,7 @@ const REPO_ROOT = path.resolve(HERE, '..');
 
 // 审核单飞锁：Kimi 邮箱与 GPT 外审共用一把锁，同一时刻只允许一条通道在审
 const { acquireReviewLock, releaseReviewLock } = await import('./lib/review-lock.mjs');
+const { routeBlocks } = await import('./lib/review-route.mjs');
 const KIMI_LOCK_TTL_MS = 6 * 3600 * 1000;
 const REF_DIR = path.join(REPO_ROOT, '.dsh', 'skills', 'aris', 'references', 'skills', 'shared-references');
 
@@ -911,6 +912,8 @@ function refsSection(refs) {
 function cmdEnqueue(cfg, args, mb, { prompts, target, round }) {
   ensureMailbox(mb);
   const targetRel = relTo(cfg.project, target.abs);
+  const routeBlocked = routeBlocks(REPO_ROOT, 'kimi');
+  if (routeBlocked) fail(routeBlocked);
   const lock = acquireReviewLock(REPO_ROOT, {
     channel: 'kimi',
     task: 'mailbox_review',

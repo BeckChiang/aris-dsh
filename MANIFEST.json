@@ -1,11 +1,11 @@
 {
   "repo": "BeckChiang/aris-dsh",
-  "generated_at": "2026-11-18T07:05:57.421Z",
+  "generated_at": "2026-11-18T07:41:29.261Z",
   "note": "由 scripts/sync.mjs 从本机 DSH 工作区单向生成；本文件为发布快照标识，请勿手改。",
   "rules_version": 1,
   "counts": {
-    "files": 677,
-    "bytes": 12933946
+    "files": 678,
+    "bytes": 12941150
   },
   "excluded": [
     "tests",
@@ -3214,8 +3214,8 @@
     },
     {
       "p": "bin/aris-review.mjs",
-      "sha256": "648de73d30dd98d2",
-      "bytes": 70150
+      "sha256": "dbb64bf5a5fbcea1",
+      "bytes": 70309
     },
     {
       "p": "bin/aris-run.mjs",
@@ -3244,8 +3244,8 @@
     },
     {
       "p": "bin/lib/aris-control.mjs",
-      "sha256": "24eba816a5133a64",
-      "bytes": 44698
+      "sha256": "3a2133917f8552c8",
+      "bytes": 45130
     },
     {
       "p": "bin/lib/aris-cost.mjs",
@@ -3284,13 +3284,18 @@
     },
     {
       "p": "bin/lib/codex-review.mjs",
-      "sha256": "f2eead9749978aee",
-      "bytes": 21471
+      "sha256": "545e19d022b4934e",
+      "bytes": 21694
     },
     {
       "p": "bin/lib/review-lock.mjs",
       "sha256": "473141e91ac4a743",
       "bytes": 2560
+    },
+    {
+      "p": "bin/lib/review-route.mjs",
+      "sha256": "40300d6b4e88f167",
+      "bytes": 2846
     },
     {
       "p": "bin/lit-bibmerge.mjs",
@@ -3319,8 +3324,8 @@
     },
     {
       "p": "docs/ARIS-流水线与面板手册.md",
-      "sha256": "b6af0e73c36f3b91",
-      "bytes": 32317
+      "sha256": "a20b1026d4bad497",
+      "bytes": 33175
     },
     {
       "p": "LICENSE",
@@ -3329,8 +3334,8 @@
     },
     {
       "p": "plugins/dsh-aris/client.js",
-      "sha256": "27405286b3baf794",
-      "bytes": 89355
+      "sha256": "8ec471286c76cf68",
+      "bytes": 92025
     },
     {
       "p": "plugins/dsh-aris/cordis.patch.yml",
@@ -3344,8 +3349,8 @@
     },
     {
       "p": "plugins/dsh-aris/index.js",
-      "sha256": "96f1f8ff03bc8658",
-      "bytes": 39272
+      "sha256": "c042d50eefe3070e",
+      "bytes": 39288
     },
     {
       "p": "plugins/dsh-aris/lib/actions.mjs",
