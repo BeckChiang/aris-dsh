@@ -555,8 +555,26 @@ export function describePipeline(workspace, entry, settings) {
     // 运行中优先给本轮会话（runtime.sessionId 收尾才更新，会是上一轮的 id）。
     lastSessionId: liveSessionId(root) || runtime.sessionId || (lastRun && lastRun.sessionId) || null,
     totals: { runs: costs.count, cny: (costs.total && costs.total.cny) || 0, usage: (costs.total && costs.total.usage) || null },
-    nextAt: config.enabled === false ? null : runtime.nextAt || null,
-    nextAtBasis: config.enabled === false ? null : runtime.nextAtBasis || null,
+    // 下一轮：runtime 里没有就现算，避免「刚启用 / 刚改设置」时卡片显示空。
+    ...(() => {
+      if (config.enabled === false) return { nextAt: null, nextAtBasis: null };
+      if (runtime.nextAt) return { nextAt: runtime.nextAt, nextAtBasis: runtime.nextAtBasis || 'interval' };
+      if (pending.length) {
+        return {
+          nextAt: nextRunAt(settings, mode, Date.now(), { pending: true, submittedAt: pendingSubmittedAt(pending) }),
+          nextAtBasis: 'mailbox',
+        };
+      }
+      let gate = null;
+      try {
+        if (readReviewRoute(workspace).channel !== 'kimi') gate = quotaGate(workspace, readCodexConfig(workspace));
+      } catch {
+        gate = null;
+      }
+      const blockedUntil = gate && gate.blocked && gate.freeAt ? Date.parse(gate.freeAt) || 0 : 0;
+      const at = nextRunAt(settings, mode, Date.now(), { blockedUntil });
+      return { nextAt: at, nextAtBasis: gate && gate.blocked ? (gate.freeAt ? 'quota' : 'quota-stuck') : 'interval' };
+    })(),
     consecutiveErrors: runtime.consecutiveErrors || 0,
     lastError: runtime.lastError || null,
     costFile: costsFile(root),
@@ -962,6 +980,12 @@ export async function control(workspace, name, input = {}, config = {}) {
       const patch = { enabled: true };
       if (input.intervalMinutes != null) patch.intervalMinutes = Number(input.intervalMinutes) || 0;
       saveConfig(root, patch);
+      // 启用后立刻排一次下一轮，否则卡片会一直显示「无下次时间」。
+      try {
+        recalcNextAt(workspace, readSettings(workspace), readHandoff(workspace).mode === 'kimi' ? 'kimi' : 'dsh');
+      } catch {
+        /* 排期失败不影响启用 */
+      }
       // 重新启用时把上一次被杀/中断留下的 error 状态清掉，否则卡片一直显示「出错」。
       const rt = readRuntime(root);
       // 启用即撤回停止意图（本轮跑完继续，下一轮照常调度），顺带清掉旧的 stop-request 残留。
