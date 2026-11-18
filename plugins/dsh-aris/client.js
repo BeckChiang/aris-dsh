@@ -114,6 +114,8 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
 .daris-btn:disabled{opacity:.45;cursor:default}
 .daris-btn.primary{border-color:rgba(127,127,127,.62);background:rgba(127,127,127,.14);font-weight:600}
 .daris-btn.danger{color:var(--dsw-alias-state-error-primary,#b42318);border-color:color-mix(in srgb,var(--dsw-alias-state-error-primary,#b42318) 45%,transparent)}
+.daris-btn.success{color:var(--dsw-alias-state-success-primary,#18794e);border-color:color-mix(in srgb,var(--dsw-alias-state-success-primary,#18794e) 55%,transparent);background:color-mix(in srgb,var(--dsw-alias-state-success-primary,#18794e) 12%,transparent);font-weight:600}
+.daris-btn.success:hover{border-color:var(--dsw-alias-state-success-primary,#18794e);background:color-mix(in srgb,var(--dsw-alias-state-success-primary,#18794e) 18%,transparent)}
 .daris-input{border:1px solid var(--dsw-alias-border-l2,rgba(127,127,127,.35));border-radius:8px;padding:4px 8px;font:inherit;font-size:12.5px;background:var(--dsw-alias-bg-layer-1,transparent);color:inherit}
 .daris-input:focus{outline:none;border-color:rgba(127,127,127,.62)}
 .daris-grow{flex:1 1 420px;min-width:260px}
@@ -155,6 +157,8 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
 .daris-chip.on{background:rgba(127,127,127,.2);border-color:rgba(127,127,127,.5);font-weight:600}
 .daris-audit{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
 .daris-tag.bad{color:var(--dsw-alias-state-error-primary,#b42318);border-color:currentColor}
+.daris-tag.ok{color:var(--dsw-alias-state-success-primary,#18794e);border-color:currentColor;opacity:.95}
+.daris-tag.warn{color:var(--dsw-alias-state-warning-primary,#b45309);border-color:currentColor;opacity:.95}
 .daris-tag.run{color:var(--dsw-alias-state-warning-primary,#b26a00);border-color:currentColor;opacity:.9;align-self:center}
 /* 主产物条：当前流水线最关键的论文成品固定置顶，不埋在文件列表里。 */
 .daris-main{display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:space-between;border:1px solid color-mix(in srgb,var(--dsw-alias-brand-primary,#2563eb) 34%,transparent);border-left:3px solid var(--dsw-alias-brand-primary,#2563eb);border-radius:10px;padding:10px 14px;margin:8px 0 12px;background:var(--dsw-alias-bg-layer-1,rgba(127,127,127,.06))}
@@ -516,7 +520,7 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
     }
 
     function Btn(props) {
-      const cls = ['daris-btn', props.primary ? 'primary' : '', props.danger ? 'danger' : ''].join(' ');
+      const cls = ['daris-btn', props.primary ? 'primary' : '', props.danger ? 'danger' : '', props.success ? 'success' : ''].join(' ');
       return h('button', { className: cls, disabled: props.disabled, title: props.title, onClick: props.onClick }, props.label);
     }
 
@@ -562,6 +566,80 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
             sub ? h('div', { className: 'daris-sub' }, sub) : null),
           badge ? h('span', { className: 'daris-tag' }, badge) : null),
         open ? h('div', { style: { marginTop: 8 } }, children) : null);
+    }
+
+    // 审核结果：两条通道的审稿产物按结论分类，集中在一处看
+    function ReviewResults(props) {
+      const { reviews } = props;
+      const rv = reviews || { total: 0, items: [], byVerdict: {}, byChannel: {} };
+      const [verdict, setVerdict] = React.useState('all');
+      const [channel, setChannel] = React.useState('all');
+      const [openKey, setOpenKey] = React.useState('');
+      const [texts, setTexts] = React.useState({});
+      const [err, setErr] = React.useState('');
+      const VERD = [['all', '全部'], ['accept', '通过'], ['revise', '待修'], ['reject', '退回'], ['unknown', '未判定']];
+      const CH = [['all', '两条通道'], ['kimi', 'Kimi'], ['gpt', 'GPT'], ['other', '未标注']];
+      const count = (map, k) => (k === 'all' ? rv.total || 0 : (map || {})[k] || 0);
+      const items = (rv.items || []).filter((it) => (verdict === 'all' || it.verdict === verdict) && (channel === 'all' || it.channel === channel));
+      const openOne = async (it) => {
+        const key = it.key || it.rel;
+        if (openKey === key) { setOpenKey(''); return; }
+        setOpenKey(key);
+        if (texts[key] || !it.name || !(it.mdRel || it.rel)) return;
+        try {
+          const res = await getArtifactFile(it.name, it.mdRel || it.rel);
+          setTexts((prev) => ({ ...prev, [key]: String((res && res.text) || '（空）') }));
+        } catch (e) {
+          setErr(String((e && e.message) || e));
+        }
+      };
+      return h(Group, {
+        title: '审核结果 · 按结论分类',
+        sub: '两条通道的审稿产物都汇总在这里（各流水线 .aris/reviews/）：先按结论筛，再按通道筛；点一行展开摘要与原文。',
+        badge: `共 ${rv.total || 0} 份`,
+        defaultOpen: true,
+      },
+        h('div', null,
+          h('div', { className: 'daris-row', style: { marginTop: 6, flexWrap: 'wrap' } },
+            VERD.map(([v, label]) => h(Btn, {
+              key: `v-${v}`,
+              label: `${label} ${count(rv.byVerdict, v)}`,
+              primary: verdict === v,
+              onClick: () => setVerdict(v),
+            }))),
+          h('div', { className: 'daris-row', style: { marginTop: 6, flexWrap: 'wrap' } },
+            CH.map(([c, label]) => h(Btn, {
+              key: `c-${c}`,
+              label: `${label} ${count(rv.byChannel, c)}`,
+              primary: channel === c,
+              onClick: () => setChannel(c),
+            }))),
+          err ? h('div', { className: 'daris-err', style: { marginTop: 8 } }, err) : null,
+          items.length
+            ? items.map((it) => {
+              const key = it.key || it.rel;
+              const open = openKey === key;
+              const tone = it.verdict === 'accept' ? 'ok' : it.verdict === 'reject' ? 'bad' : it.verdict === 'revise' ? 'warn' : '';
+              return h('div', { key, style: { marginTop: 8 } },
+                h('div', { className: 'daris-row', style: { cursor: 'pointer', flexWrap: 'wrap' }, onClick: () => openOne(it) },
+                  h('span', { className: 'daris-tag' }, `${open ? '▾' : '▸'} ${ft(it.at)}`),
+                  h('span', { className: 'daris-tag' }, it.name || it.project || '-'),
+                  h('span', { className: 'daris-tag' }, it.channel === 'gpt' ? 'GPT' : it.channel === 'kimi' ? 'Kimi' : (it.channel || '-')),
+                  h('span', { className: `daris-tag ${tone}`.trim() }, it.verdict),
+                  it.score != null ? h('span', { className: 'daris-tag' }, `${it.score}/10`) : null,
+                  it.task ? h('span', { className: 'daris-tag' }, it.task) : null,
+                  it.model ? h('span', { className: 'daris-path' }, it.model) : null),
+                open
+                  ? h('div', { style: { marginTop: 6 } },
+                    it.summary ? h('div', { className: 'daris-sub' }, it.summary) : null,
+                    it.mdRel || it.rel ? h('div', { className: 'daris-path', style: { marginTop: 4 } }, `${it.name || ''}/${it.mdRel || it.rel}`) : null,
+                    texts[key]
+                      ? h('pre', { className: 'daris-pre', style: { maxHeight: 340 } }, texts[key].slice(0, 6000))
+                      : h('div', { className: 'daris-tag', style: { marginTop: 6 } }, '正在读取原文…'))
+                  : null);
+            })
+            : h('div', { className: 'daris-tag', style: { marginTop: 8 } }, '没有符合筛选的审稿记录。'),
+          rv.truncated ? h('div', { className: 'daris-tag', style: { marginTop: 8 } }, '只显示最近 100 份，完整清单在各自 .aris/reviews/') : null));
     }
 
     // 审核线路：明确选一条，另一条会被闸门挡住
@@ -636,7 +714,7 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
         },
           h('div', null,
             h('div', { className: 'daris-row', style: { marginTop: 8 } },
-              h(Btn, { label: c.enabled ? '已启用 · 点击停用' : '未启用 · 点击启用', primary: !c.enabled, danger: c.enabled, disabled: busy, onClick: () => save({ enabled: !c.enabled }) }),
+              h(Btn, { label: c.enabled ? '已启用 · 点击停用' : '未启用 · 点击启用', success: !c.enabled, danger: c.enabled, disabled: busy, onClick: () => save({ enabled: !c.enabled }) }),
               h('span', { className: 'daris-tag' }, codex.exeOk ? 'codex.exe 已找到' : 'codex.exe 未找到'),
               h('span', { className: 'daris-tag' }, `本小时 ${codex.usedThisHour}/${c.hourlyLimit}`),
               h('span', { className: 'daris-tag' }, `今日 ${codex.todayCount}${Number(c.dailyLimit) > 0 ? '/' + c.dailyLimit : '（不限）'}`),
@@ -1078,7 +1156,7 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
                   ? h(Btn, { label: '停止中…', disabled: true })
                   : p.enabled
                   ? h(Btn, { label: '停用', disabled: busy, onClick: () => act('stop', { root: p.root }) })
-                  : h(Btn, { label: '启用', primary: true, disabled: busy, onClick: () => act('start', { root: p.root }) }),
+                  : h(Btn, { label: '启用', success: true, disabled: busy, onClick: () => act('start', { root: p.root }) }),
                 p.stopping
                   ? h(Btn, { label: '强制停止', danger: true, title: '立刻杀掉本轮进程（可能留下未提交的改动）', disabled: busy, onClick: () => act('stop', { root: p.root, force: true }) })
                   : null,
@@ -1136,6 +1214,7 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
           : '当前空闲';
         body = h('div', null,
           h(RouteCard, { codex: data.codex, busy, act }),
+          h(ReviewResults, { reviews: data.reviews }),
           h(Group, {
             title: '审核锁 · 同一时刻只跑一条',
             sub: 'Kimi 投递占锁、收件解锁；GPT 派单占锁、跑完解锁。锁没放掉之前，另一个通道的派单会被直接拒绝。',

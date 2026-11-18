@@ -29,6 +29,7 @@ import { costView, effectiveInterval, isRunning, kimiIntervalMinutes, nextKimiTi
 import { resolveDsh } from './aris-dsh.mjs?v=46';
 import { CODEX_TASKS, codexState, listModels, readCodexConfig, runCodexReview, saveCodexConfig } from './codex-review.mjs?v=3';
 import { readReviewRoute, routeBlocks, saveReviewRoute } from './review-route.mjs';
+import { collectReviewResults } from './review-results.mjs';
 
 const BIN_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -664,6 +665,7 @@ export function snapshot(workspace, config = {}) {
       return { kind: d.kind, file: d.file };
     })(),
     codex: codexSnapshot(workspace),
+    reviews: collectReviewResults(workspace),
     pipelines,
     running,
     mailbox: mailboxState(settings.mailbox),
