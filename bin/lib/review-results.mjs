@@ -16,11 +16,13 @@ function normVerdict(v) {
 
 function channelOf(backend, hint) {
   const b = String(backend || '').toLowerCase();
+  const h = String(hint || '').toLowerCase();
   if (b === 'codex') return 'gpt';
+  // 改派记录：邮箱通道送进去、其实是 GPT 答的（本项目 2026-11-18 起有这种）
+  if ((b === 'mailbox' || b === 'kimi-mailbox' || b === 'kimi') && /codex|gpt|openai/.test(h)) return 'gpt';
   if (b === 'mailbox' || b === 'kimi-mailbox' || b === 'kimi') return 'kimi';
   if (b === 'direct') return 'direct';
   // 老记录没写 backend：按审稿人自报的身份猜一把，猜不出就归 other
-  const h = String(hint || '').toLowerCase();
   if (/kimi|moonshot/.test(h)) return 'kimi';
   if (/codex|gpt|openai/.test(h)) return 'gpt';
   return 'other';

@@ -29,7 +29,7 @@ import { costView, effectiveInterval, isRunning, kimiIntervalMinutes, nextKimiTi
 import { resolveDsh } from './aris-dsh.mjs?v=46';
 import { CODEX_TASKS, codexState, listModels, normalizeWorkspace, previewPrompt, readCodexConfig, runCodexReview, saveCodexConfig, quotaGate } from './codex-review.mjs?v=6';
 import { readProjectSlots, readReviewRoute, routeBlocks, saveReviewRoute } from './review-route.mjs?v=3';
-import { collectReviewResults } from './review-results.mjs';
+import { collectReviewResults } from './review-results.mjs?v=2';
 import { readSessionTranscript } from './codex-session.mjs';
 
 const BIN_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');

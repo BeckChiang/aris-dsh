@@ -1,11 +1,11 @@
 {
   "repo": "BeckChiang/aris-dsh",
-  "generated_at": "2026-11-18T10:34:41.077Z",
+  "generated_at": "2026-11-18T10:59:04.040Z",
   "note": "由 scripts/sync.mjs 从本机 DSH 工作区单向生成；本文件为发布快照标识，请勿手改。",
   "rules_version": 1,
   "counts": {
     "files": 681,
-    "bytes": 13024571
+    "bytes": 13024961
   },
   "excluded": [
     "tests",
@@ -3244,8 +3244,8 @@
     },
     {
       "p": "bin/lib/aris-control.mjs",
-      "sha256": "28716b33b7cb820c",
-      "bytes": 56564
+      "sha256": "04d411da3fd0a73c",
+      "bytes": 56568
     },
     {
       "p": "bin/lib/aris-cost.mjs",
@@ -3304,8 +3304,8 @@
     },
     {
       "p": "bin/lib/review-results.mjs",
-      "sha256": "5a4cc852eb386009",
-      "bytes": 6223
+      "sha256": "b0129270a0024857",
+      "bytes": 6609
     },
     {
       "p": "bin/lib/review-route.mjs",
