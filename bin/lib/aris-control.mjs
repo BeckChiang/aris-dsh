@@ -27,7 +27,7 @@ import {
 } from './aris-registry.mjs?v=46';
 import { costView, effectiveInterval, isRunning, kimiIntervalMinutes, nextKimiTick, nextRunAt, pendingReviews, pendingSubmittedAt, preflight, recoverStale, resetPrompt, runOnce, cancelStopIntent, stopPipeline, tick, todayStats } from './aris-runner.mjs?v=47';
 import { resolveDsh } from './aris-dsh.mjs?v=46';
-import { CODEX_TASKS, codexState, listModels, normalizeWorkspace, previewPrompt, readCodexConfig, runCodexReview, saveCodexConfig } from './codex-review.mjs?v=5';
+import { CODEX_TASKS, codexState, listModels, normalizeWorkspace, previewPrompt, readCodexConfig, runCodexReview, saveCodexConfig, quotaGate } from './codex-review.mjs?v=6';
 import { readReviewRoute, routeBlocks, saveReviewRoute } from './review-route.mjs';
 import { collectReviewResults } from './review-results.mjs';
 import { readSessionTranscript } from './codex-session.mjs';
@@ -449,11 +449,28 @@ export function recalcNextAt(workspace, settings, mode) {
     const interval = effectiveInterval(config, settings, mode);
     const finishedMs = runtime.lastRun && runtime.lastRun.finishedAt ? Date.parse(runtime.lastRun.finishedAt) : 0;
     const pending = pendingReviews(settings, entry.root);
+    // GPT 额度用完时，下一轮要等额度恢复；线路设成 kimi 则不看 GPT 额度。
+    let gate = null;
+    try {
+      if (readReviewRoute(workspace).channel !== 'kimi') gate = quotaGate(workspace, readCodexConfig(workspace));
+    } catch {
+      gate = null;
+    }
+    const blockedUntil = gate && gate.blocked && gate.freeAt ? Date.parse(gate.freeAt) || 0 : 0;
     const nextAt = config.enabled
-      ? nextRunAt(settings, mode, Date.now(), { pending: pending.length > 0, submittedAt: pendingSubmittedAt(pending) })
+      ? nextRunAt(settings, mode, Date.now(), {
+          pending: pending.length > 0,
+          submittedAt: pendingSubmittedAt(pending),
+          blockedUntil,
+        })
       : null;
-    const byInterval = finishedMs && !pending.length ? new Date(finishedMs + interval * 60_000).toISOString() : nextAt;
-    saveRuntime(entry.root, { nextAt: config.enabled ? (pending.length || Date.parse(byInterval) > Date.now() ? byInterval : nextAt) : null, blockedUntil: null });
+    const byInterval = finishedMs && !pending.length ? new Date(Math.max(finishedMs + interval * 60_000, blockedUntil || 0)).toISOString() : nextAt;
+    const basis = !config.enabled ? null : pending.length ? 'mailbox' : gate && gate.blocked ? 'quota' : 'interval';
+    saveRuntime(entry.root, {
+      nextAt: config.enabled ? (pending.length || Date.parse(byInterval) > Date.now() ? byInterval : nextAt) : null,
+      nextAtBasis: basis,
+      blockedUntil: null,
+    });
   }
 }
 
@@ -539,6 +556,7 @@ export function describePipeline(workspace, entry, settings) {
     lastSessionId: liveSessionId(root) || runtime.sessionId || (lastRun && lastRun.sessionId) || null,
     totals: { runs: costs.count, cny: (costs.total && costs.total.cny) || 0, usage: (costs.total && costs.total.usage) || null },
     nextAt: config.enabled === false ? null : runtime.nextAt || null,
+    nextAtBasis: config.enabled === false ? null : runtime.nextAtBasis || null,
     consecutiveErrors: runtime.consecutiveErrors || 0,
     lastError: runtime.lastError || null,
     costFile: costsFile(root),

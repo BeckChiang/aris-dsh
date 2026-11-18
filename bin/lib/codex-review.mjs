@@ -441,6 +441,27 @@ export function checkBudget(workspace, cfg = readCodexConfig(workspace)) {
   return { ok: true, remaining, used, budget, hourlyLimit: cfg.hourlyLimit, waitMinutes: 0 };
 }
 
+/**
+ * 下一轮最早什么时候能再派单（供面板算 ETA / 起轮闸门用）：
+ *   - 额度还有 → { blocked:false }
+ *   - 本小时额度用完 → 等窗口里「最早那次」滑出（calls 升序第 used-limit 个 + 1 小时）
+ *   - 连续失败停摆 → blocked 但没有时间点（要人工恢复）
+ * 只读，不写预算。
+ */
+export function quotaGate(workspace, cfg = readCodexConfig(workspace)) {
+  const budget = readBudget(workspace);
+  const used = budget.calls.length;
+  const limit = Math.max(1, Number(cfg.hourlyLimit) || 1);
+  if (budget.consecutiveFailures >= 3) {
+    return { blocked: true, freeAt: null, minutes: null, reason: '连续 3 次失败，需人工恢复', used, limit };
+  }
+  if (used < limit) return { blocked: false, freeAt: null, minutes: 0, used, limit };
+  const sorted = [...budget.calls].sort((a, b) => a - b);
+  const freeMs = sorted[Math.max(0, used - limit)] + WINDOW_MS;
+  const minutes = Math.max(1, Math.ceil((freeMs - Date.now()) / 60000));
+  return { blocked: true, freeAt: new Date(freeMs).toISOString(), minutes, reason: `本小时额度已用完（${limit} 次/小时）`, used, limit };
+}
+
 function recordCall(workspace, { ok, entry }) {
   const budget = readBudget(workspace);
   if (ok) {
@@ -810,6 +831,7 @@ export function codexState(workspace) {
   return {
     route: readReviewRoute(workspace),
     quota,
+    quotaGate: quotaGate(workspace, cfg),
     config: cfg,
     taskDefs,
     stageDefs: taskDefs, // 旧名兼容

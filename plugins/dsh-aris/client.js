@@ -1258,7 +1258,10 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
               ? h('span', { className: 'daris-when' }, '已登记停止 · 本轮跑完即停')
               : p.enabled && waiting
               ? h('span', { className: 'daris-when' }, `下次运行 ${ft(p.nextAt)}`)
-              : (p.enabled && p.nextAt ? h('span', { className: 'daris-when' }, `下次 ${ft(p.nextAt)}`) : null)] },
+              : (p.enabled && p.nextAt
+                ? h('span', { className: 'daris-when', title: p.nextAtBasis === 'quota' ? 'GPT 本小时额度已用完，等到窗口滑出才会起下一轮' : p.nextAtBasis === 'mailbox' ? '在途审稿等 Kimi 取件回件' : '按节拍起下一轮' },
+                    `${p.nextAtBasis === 'quota' ? '等 GPT 额度 · ' : p.nextAtBasis === 'mailbox' ? '等 Kimi 取件 · ' : '下次 '}${ft(p.nextAt)}`)
+                : null)] },
           h('div', { className: 'daris-body' },
             h('div', { className: 'daris-grid2' },
               h(Block, { title: '正在做什么', extra: p.stopping ? '运行中 · 已登记停止' : p.running ? (activity && activity.phase ? activity.phase : '启动中') : (activity ? '上一轮（已结束）' : '') },

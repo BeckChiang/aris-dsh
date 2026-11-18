@@ -70,7 +70,7 @@ export function nextKimiTick(settings = {}, fromMs = Date.now()) {
  *  - 有在途审稿：等下一次 Kimi 取件 + 审稿窗口，拿到完整返回再跑；
  *  - 没有在途审稿：立刻跑（20 分钟冷却只是给 Kimi 乒乓模式用的）。
  */
-export function nextRunAt(settings = {}, mode = 'dsh', fromMs = Date.now(), { pending = false, submittedAt = 0 } = {}) {
+export function nextRunAt(settings = {}, mode = 'dsh', fromMs = Date.now(), { pending = false, submittedAt = 0, blockedUntil = 0 } = {}) {
   const base = kimiIntervalMinutes(settings);
   const review = Math.max(5, Number((settings.kimi && settings.kimi.reviewMinutes) || 15));
   if (pending) {
@@ -81,6 +81,8 @@ export function nextRunAt(settings = {}, mode = 'dsh', fromMs = Date.now(), { pe
     if (at <= now) at = nextKimiTick(settings, now) + review * 60_000 + 60_000;
     return new Date(at).toISOString();
   }
+  // GPT 侧额度用完时，下一轮也不能早于「额度恢复」那个时刻。
+  if (blockedUntil && Number(blockedUntil) > fromMs) return new Date(Number(blockedUntil)).toISOString();
   if (mode === 'kimi') return new Date(fromMs + base * 60_000).toISOString();
   return new Date(fromMs).toISOString();
 }
@@ -738,9 +740,24 @@ export async function runOnce(options = {}) {
   };
   const modeNow = options.mode || handoffMode(workspace);
   const pendingList = pendingReviews(settings, root);
-  const nextAt = config.enabled
-    ? nextRunAt(settings, modeNow, Date.now(), { pending: pendingList.length > 0, submittedAt: pendingSubmittedAt(pendingList) })
-    : null;
+  // 下一轮时间有三条支路：等 Kimi 取件 / 等 GPT 额度恢复 / 按节拍。面板按 nextAtBasis 显示在等谁。
+  let nextAt = null;
+  let nextAtBasis = null;
+  if (config.enabled) {
+    if (pendingList.length) {
+      nextAt = nextRunAt(settings, modeNow, Date.now(), { pending: true, submittedAt: pendingSubmittedAt(pendingList) });
+      nextAtBasis = 'mailbox';
+    } else {
+      const gate = await gptQuotaGate(workspace);
+      if (gate && gate.blocked && gate.freeAt) {
+        nextAt = new Date(Math.max(Date.parse(gate.freeAt) || 0, Date.now())).toISOString();
+        nextAtBasis = 'quota';
+      } else {
+        nextAt = nextRunAt(settings, modeNow, Date.now(), { pending: false });
+        nextAtBasis = gate && gate.blocked ? 'quota-stuck' : 'interval';
+      }
+    }
+  }
   flushActivity(true);
   const ok = exit === 0 && !errorText.includes('已终止');
   // stderr 里的模型清单/加载日志不是错误，别写进「最近错误」。
@@ -824,6 +841,7 @@ export async function runOnce(options = {}) {
     },
     totals,
     nextAt: userStopped ? null : nextAt,
+    nextAtBasis: userStopped ? null : nextAtBasis,
     consecutiveErrors: userStopped || ok ? 0 : (prev.consecutiveErrors || 0) + 1,
   });
   if (capHit) {
@@ -835,6 +853,25 @@ export async function runOnce(options = {}) {
   }
 
   return { ok, runId, exit, usage, cny, summary: meta.summary, verdict, dir };
+}
+
+/**
+ * GPT 侧额度闸门：只在评审线路允许 GPT（auto 或 gpt）时才算。
+ * 线路设成 kimi 时，GPT 额度用不上去，也不该拦下一轮。
+ */
+async function gptQuotaGate(workspace) {
+  try {
+    const mod = await import('./codex-review.mjs');
+    let channel = 'auto';
+    try {
+      const dash = JSON.parse(fs.readFileSync(path.join(workspace, '.dsh', 'aris-dashboard.json'), 'utf8'));
+      channel = String((dash && dash.external && dash.external.review && dash.external.review.channel) || 'auto');
+    } catch { /* 没配置按 auto */ }
+    if (channel === 'kimi') return null;
+    return mod.quotaGate(workspace, mod.readCodexConfig(workspace));
+  } catch {
+    return null; // 读不到预算就别拦调度，宁可让它跑一轮再说
+  }
 }
 
 /** 用户主动停用的标记：本轮退出时据此把状态写成 stopped 而不是 error。 */
