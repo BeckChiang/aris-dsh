@@ -7,23 +7,39 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
+import { acquireReviewLock, inspectReviewLock, releaseReviewLock, reviewLockFile } from './review-lock.mjs';
 
 export const CODEX_HOME = path.join(os.homedir(), '.codex');
 const WINDOW_MS = 60 * 60 * 1000;
 
-/** 面板里可选的环节（也是 reviewer.json / settings 里的键）。 */
-export const CODEX_STAGES = [
-  { key: 'S1_formal', label: 'S1 形式化', model: 'gpt-6-luna', effort: 'low' },
-  { key: 'S2_data', label: 'S2 数据管线', model: 'gpt-6-luna', effort: 'low' },
-  { key: 'S3_baseline', label: 'S3 基线', model: 'gpt-6.2-sol', effort: 'medium' },
-  { key: 'S4_core', label: 'S4 匹配/规划/展开/桥接', model: 'gpt-6.2-sol', effort: 'medium' },
-  { key: 'S5_experiments', label: 'S5 端到端实验', model: 'gpt-6.2-astra', effort: 'high' },
-  { key: 'S6_writing', label: 'S6 写作', model: 'gpt-6.2-sol', effort: 'medium' },
-  { key: 'kill_argument', label: 'kill-argument 对抗审', model: 'gpt-6.2-astra', effort: 'high' },
-  { key: 'claim_audit', label: '论断核对', model: 'gpt-6.1-terra', effort: 'medium' },
-  { key: 'citation_audit', label: '引用核销', model: 'gpt-6-luna', effort: 'low' },
-  { key: 'layout_check', label: '版面/图表检查', model: 'gpt-6.1-terra', effort: 'medium' },
+/** 任务分类：按「这一单要审什么」分档，不对应流水线阶段。
+ *  流水线阶段会变（S1…S6 是某篇论文的分法），任务类型是稳定的。 */
+export const CODEX_TASKS = [
+  { key: 'format_check', label: '格式/数据核对', model: 'gpt-6-luna', effort: 'low', hint: '规则明确的机械活：章节齐全、数字前后一致、表格字段对得上' },
+  { key: 'routine_review', label: '常规审查', model: 'gpt-6.2-sol', effort: 'medium', hint: '日常文档与改动审查，最常用的一档' },
+  { key: 'deep_attack', label: '深度论证攻击', model: 'gpt-6.2-astra', effort: 'high', hint: '找致命反驳、跨材料综合、大改方案审读' },
+  { key: 'claim_audit', label: '论点—证据核对', model: 'gpt-6.1-terra', effort: 'medium', hint: '逐条结论回原文找证据，常要读图与版面' },
+  { key: 'citation_audit', label: '引用与元数据', model: 'gpt-6-luna', effort: 'low', hint: 'bib / DOI / 页码 / 作者顺序比对' },
+  { key: 'layout_check', label: '版面与图表', model: 'gpt-6.1-terra', effort: 'medium', hint: '排版、图注、图内文字可读性' },
+  { key: 'writing_review', label: '写作与结构审读', model: 'gpt-6.2-sol', effort: 'medium', hint: '行文、章节结构、读者可理解性' },
 ];
+
+/** 旧配置键（流水线阶段）→ 任务分类，读配置时自动迁移。 */
+const LEGACY_STAGE_MAP = {
+  S1_formal: 'format_check',
+  S2_data: 'format_check',
+  S3_baseline: 'routine_review',
+  S4_core: 'routine_review',
+  S5_experiments: 'deep_attack',
+  S6_writing: 'writing_review',
+  kill_argument: 'deep_attack',
+  claim_audit: 'claim_audit',
+  citation_audit: 'citation_audit',
+  layout_check: 'layout_check',
+};
+
+/** @deprecated 旧名，保留给还按「环节」引用的调用方。 */
+export const CODEX_STAGES = CODEX_TASKS;
 
 export const CODEX_DEFAULTS = {
   enabled: false,
@@ -33,7 +49,7 @@ export const CODEX_DEFAULTS = {
   proxy: 'http://127.0.0.1:7897',
   maxChars: 250000, // 单稿上限（Astra 只有 272k 上下文，这里取保守值）
   sandboxMode: 'read-only', // read-only=只读正文（安全）| danger-full-access=允许它自己翻仓库
-  stages: Object.fromEntries(CODEX_STAGES.map((s) => [s.key, { model: s.model, effort: s.effort, enabled: true }])),
+  tasks: Object.fromEntries(CODEX_TASKS.map((s) => [s.key, { model: s.model, effort: s.effort, enabled: true }])),
 };
 
 function readJsonSafe(file, fallback) {
@@ -67,19 +83,32 @@ export function runsLogFile(workspace) {
 export function readCodexConfig(workspace) {
   const raw = readJsonSafe(settingsFile(workspace), {}) || {};
   const ext = (raw.external && raw.external.codex) || {};
-  const stages = {};
-  for (const s of CODEX_STAGES) {
-    const saved = (ext.stages && ext.stages[s.key]) || {};
-    stages[s.key] = {
-      model: String(saved.model || s.model),
-      effort: String(saved.effort || s.effort),
+  // 新键是 ext.tasks（任务分类），旧键是 ext.stages（流水线阶段）：都读，旧键按表迁移，
+  // 同一分类下新键优先（先铺旧的，再被新的覆盖）。
+  const normalized = {};
+  for (const [k, v] of Object.entries(ext.stages || {})) {
+    const key = LEGACY_STAGE_MAP[k] || k;
+    if (!CODEX_TASKS.some((t) => t.key === key)) continue;
+    normalized[key] = { ...(normalized[key] || {}), ...(v || {}) };
+  }
+  for (const [k, v] of Object.entries(ext.tasks || {})) {
+    const key = LEGACY_STAGE_MAP[k] || k;
+    if (!CODEX_TASKS.some((t) => t.key === key)) continue;
+    normalized[key] = { ...(normalized[key] || {}), ...(v || {}) };
+  }
+  const tasks = {};
+  for (const t of CODEX_TASKS) {
+    const saved = normalized[t.key] || {};
+    tasks[t.key] = {
+      model: String(saved.model || t.model),
+      effort: String(saved.effort || t.effort),
       enabled: saved.enabled !== false,
     };
   }
   return {
     ...CODEX_DEFAULTS,
     ...ext,
-    stages,
+    tasks,
     hourlyLimit: Math.max(1, Math.min(60, Number(ext.hourlyLimit ?? CODEX_DEFAULTS.hourlyLimit) || 1)),
     dailyLimit: Math.max(0, Number(ext.dailyLimit || 0)),
     timeoutMinutes: Math.max(1, Math.min(30, Number(ext.timeoutMinutes || CODEX_DEFAULTS.timeoutMinutes))),
@@ -89,22 +118,32 @@ export function readCodexConfig(workspace) {
 
 export function saveCodexConfig(workspace, patch = {}) {
   const raw = readJsonSafe(settingsFile(workspace), {}) || {};
-  const current = readCodexConfig(workspace);
   const ext = { ...((raw.external && raw.external.codex) || {}) };
   for (const key of ['enabled', 'hourlyLimit', 'dailyLimit', 'timeoutMinutes', 'proxy', 'maxChars', 'sandboxMode']) {
     if (patch[key] != null) ext[key] = patch[key];
   }
-  if (patch.stages && typeof patch.stages === 'object') {
-    const next = { ...(ext.stages || {}) };
-    for (const [key, value] of Object.entries(patch.stages)) {
-      if (!CODEX_STAGES.some((s) => s.key === key)) continue;
-      next[key] = { ...(next[key] || {}), ...(value || {}) };
+  const incoming = patch.tasks || patch.stages;
+  if (incoming && typeof incoming === 'object') {
+    // 先按任务分类把旧键迁过来，避免新旧两套并存导致读的时候谁覆盖谁说不清
+    const next = {};
+    for (const [k, v] of Object.entries(ext.stages || {})) {
+      const key = LEGACY_STAGE_MAP[k] || k;
+      if (CODEX_TASKS.some((t) => t.key === key)) next[key] = { ...(next[key] || {}), ...(v || {}) };
     }
-    ext.stages = next;
+    for (const [k, v] of Object.entries(ext.tasks || {})) {
+      const key = LEGACY_STAGE_MAP[k] || k;
+      if (CODEX_TASKS.some((t) => t.key === key)) next[key] = { ...(next[key] || {}), ...(v || {}) };
+    }
+    for (const [k, v] of Object.entries(incoming)) {
+      const key = LEGACY_STAGE_MAP[k] || k;
+      if (!CODEX_TASKS.some((t) => t.key === key)) continue;
+      next[key] = { ...(next[key] || {}), ...(v || {}) };
+    }
+    ext.tasks = next;
+    delete ext.stages;
   }
   raw.external = { ...(raw.external || {}), codex: ext };
   writeJsonAtomic(settingsFile(workspace), raw);
-  void current;
   return readCodexConfig(workspace);
 }
 
@@ -258,26 +297,15 @@ function runDir(root) {
   return path.join(root, '.aris-run', 'codex');
 }
 
-function freshLock(workspace, ttlMs) {
-  const file = path.join(workspace, '.dsh', '.codex-run.lock');
-  try {
-    const st = fs.statSync(file);
-    if (Date.now() - st.mtimeMs < ttlMs) return { ok: false, file };
-    fs.rmSync(file, { force: true });
-  } catch {
-    /* 没有锁 */
-  }
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, JSON.stringify({ pid: process.pid, at: new Date().toISOString() }), 'utf8');
-  return { ok: true, file };
+function freshLock(workspace, ttlMs, taskKey) {
+  // 与 Kimi 邮箱共用同一把审核锁：两条通道任意时刻只能有一条在跑
+  const got = acquireReviewLock(workspace, { channel: 'gpt', task: taskKey, ttlMs });
+  if (!got.ok) return { ok: false, holder: got.holder };
+  return { ok: true, file: reviewLockFile(workspace) };
 }
 
-function releaseLock(lock) {
-  try {
-    fs.rmSync(lock.file, { force: true });
-  } catch {
-    /* 已释放 */
-  }
+function releaseLock(workspace) {
+  releaseReviewLock(workspace, 'gpt');
 }
 
 function parseTokens(text) {
@@ -287,16 +315,18 @@ function parseTokens(text) {
 
 /**
  * 跑一次 GPT 外审。
- * @param {{workspace:string, root:string, gate:string, task:string, model?:string, effort?:string, stamp?:string}} input
+ * @param {{workspace:string, root:string, taskKey:string, task:string, model?:string, effort?:string, stamp?:string}} input
+ *   taskKey = 任务分类（format_check / routine_review / …）；旧调用方传 gate= 也认。
  */
 export async function runCodexReview(input) {
-  const { workspace, root, gate } = input;
+  const { workspace, root } = input;
+  const taskKey = String(input.taskKey || input.gate || 'routine_review');
   const cfg = readCodexConfig(workspace);
-  if (!cfg.enabled) return { ok: false, skipped: true, error: 'GPT 外审未启用（面板「GPT 外审」开关）' };
-  const stage = cfg.stages[gate] || { model: 'gpt-6.2-sol', effort: 'medium', enabled: true };
-  if (stage.enabled === false) return { ok: false, skipped: true, error: `环节 ${gate} 未启用 GPT 外审` };
-  const model = String(input.model || stage.model);
-  const effort = String(input.effort || stage.effort);
+  if (!cfg.enabled) return { ok: false, skipped: true, error: 'GPT 外审未启用（面板「审核」开关）' };
+  const pick = cfg.tasks[taskKey] || { model: 'gpt-6.2-sol', effort: 'medium', enabled: true };
+  if (pick.enabled === false) return { ok: false, skipped: true, error: `任务分类 ${taskKey} 未启用 GPT 外审` };
+  const model = String(input.model || pick.model);
+  const effort = String(input.effort || pick.effort);
   const info = modelInfo(model);
   if (!info) {
     return { ok: false, error: `模型 ${model} 不在本机 codex 清单里（钉死的型号可能已下线），请重新选择` };
@@ -310,18 +340,28 @@ export async function runCodexReview(input) {
     return { ok: false, error: `稿件过大（${task.length} 字符 > 上限 ${cfg.maxChars}），请分节送审` };
   }
 
+  // 先看锁再扣额度：并发撞车时给出「谁在跑」，比「额度用完」有用得多
+  const current = inspectReviewLock(workspace);
+  if (current.locked && !current.expired) {
+    return {
+      ok: false,
+      busy: true,
+      error: `已有审核在跑（${current.channel} · ${current.task || '-'} · ${current.target || '-'}，${Math.round((current.ageMs || 0) / 60000)} 分钟前开始），等它结束再派单`,
+    };
+  }
+
   const gateCheck = checkBudget(workspace, cfg);
   if (!gateCheck.ok) return { ok: false, limited: true, error: gateCheck.reason, remaining: gateCheck.remaining };
 
   const timeoutMs = cfg.timeoutMinutes * 60_000;
-  const lock = freshLock(workspace, timeoutMs + 60_000);
+  const lock = freshLock(workspace, timeoutMs + 60_000, taskKey);
   if (!lock.ok) return { ok: false, busy: true, error: '已有一次外审在跑，等它结束再派单' };
 
   const stamp = input.stamp || new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const dir = runDir(root);
   fs.mkdirSync(dir, { recursive: true });
-  const taskFile = path.join(dir, `${stamp}-${gate}.task.md`);
-  const outFile = path.join(dir, `${stamp}-${gate}.reply.md`);
+  const taskFile = path.join(dir, `${stamp}-${taskKey}.task.md`);
+  const outFile = path.join(dir, `${stamp}-${taskKey}.reply.md`);
   fs.writeFileSync(taskFile, task, 'utf8');
 
   const sandbox = cfg.sandboxMode === 'danger-full-access' ? 'danger-full-access' : 'read-only';
@@ -391,7 +431,7 @@ export async function runCodexReview(input) {
       resolve({ code, stdout, stderr, timedOut });
     });
   });
-  releaseLock(lock);
+  releaseLock(workspace);
 
   let text = '';
   try {
@@ -408,7 +448,7 @@ export async function runCodexReview(input) {
   const cliEffort = (/^reasoning effort:\s*(\S+)/m.exec(banner) || [])[1] || '';
   const entry = {
     at: startedAt,
-    gate,
+    task: taskKey,
     model,
     effort,
     cliModel,
@@ -475,8 +515,12 @@ export function codexState(workspace) {
   } catch {
     recent = [];
   }
+  const taskDefs = CODEX_TASKS.map((t) => ({ key: t.key, label: t.label, hint: t.hint }));
   return {
     config: cfg,
+    taskDefs,
+    stageDefs: taskDefs, // 旧名兼容
+    lock: inspectReviewLock(workspace),
     exe,
     exeOk,
     models: models.models,

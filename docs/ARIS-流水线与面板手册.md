@@ -150,8 +150,12 @@ S7_submission 投稿（匿名稿、cover letter、预检）
 - **引用体检**：`未被引用 N`、`缺失 N`、`空章 N`（解析 `\includegraphics` 与章节字数）
 - 六组只读浏览在 `Aris_Wiki` 的「产物」页，这里不再重复
 
-### 3.3 Kimi 交接页
+### 3.3 审核页（Kimi 交接 + GPT 外审同页）
 
+Kimi 邮箱与 GPT 外审是同一件事的两条通道，所以放在一页：上半是 Kimi 交接，下半是 GPT 外审卡片（详见 3.5）。
+
+- **单飞规则**：两条通道共用一把审核锁 `<工作区>/.dsh/.review.lock`，同一时刻只允许一次审核在跑。Kimi 投递时占锁、收件时解锁；GPT 派单时占锁、跑完解锁。锁被占时再投递/再派单会被直接拒绝，并告诉你锁在谁手里、多久前开始。
+- **审核通道卡**（页面顶部）：显示当前锁状态（空闲 / 运行中：通道 · 任务 · 目标）
 - **DSH 接管 / 交回 Kimi Work**：切换 `handoff.mode`
   - `dsh`：节拍器在 DSH 里自动起轮（推荐，本机常开时用这个）
   - `kimi`：不在 DSH 起轮，改由 Kimi 侧定时任务拉起
@@ -172,7 +176,7 @@ S7_submission 投稿（匿名稿、cover letter、预检）
 | 每卡事件条数 | 事件流显示多少条 | 默认即可 |
 | Kimi 间隔 / 起始时间 | 提示词里的取件节奏与起点 | 与 Kimi 应用内定时任务一致 |
 
-### 3.5 GPT 外审页（接本机已装的 ChatGPT）
+### 3.5 GPT 外审卡片（审核页下半部分，接本机已装的 ChatGPT）
 
 不另开 API key，直接用这台机器上装好的 Codex/ChatGPT 桌面端（订阅登录）当第三个审稿族。
 
@@ -190,21 +194,23 @@ S7_submission 投稿（匿名稿、cover letter、预检）
 - **本小时剩余 / 连续失败**：口径与预算文件 `.dsh/codex-budget.json` 一致；连续失败 3 次自动停摆，需在面板手动恢复
 - **保存即回读**：保存后显示的是从磁盘重读的配置，不是前端乐观回显
 
-**环节 → 模型**（每个环节一行，可单独改模型/强度，或关掉该环节）
+**任务分类 → 模型**（按「这一单要审什么」分档，不绑流水线阶段：阶段会变，任务类型稳定）
 
-| 环节 | 默认模型 | 强度 | 理由 |
+| 任务分类 | 默认模型 | 强度 | 用在哪 |
 |---|---|---|---|
-| S1_formal / S2_data | `gpt-6-luna` | low | 格式与数据核对，规则明确 |
-| S3_baseline / S4_core | `gpt-6.2-sol` | medium | 常规改动审查的日常档 |
-| S5_experiments | `gpt-6.2-astra` | high | 跨材料、多步验证 |
-| S6_writing | `gpt-6.2-sol` | medium | 写作审读 |
-| kill_argument | `gpt-6.2-astra` | high | 找致命反驳 |
-| claim_audit / layout_check | `gpt-6.1-terra` | medium | 版面与图表需要视觉 |
-| citation_audit | `gpt-6-luna` | low | 元数据比对，机械活 |
+| `format_check` 格式/数据核对 | `gpt-6-luna` | low | 章节齐全、数字前后一致、表格字段对得上 |
+| `routine_review` 常规审查 | `gpt-6.2-sol` | medium | 日常文档与改动审查（默认） |
+| `deep_attack` 深度论证攻击 | `gpt-6.2-astra` | high | 找致命反驳、跨材料综合、大改方案审读 |
+| `claim_audit` 论点—证据核对 | `gpt-6.1-terra` | medium | 逐条结论回原文找证据，要读图与版面 |
+| `citation_audit` 引用与元数据 | `gpt-6-luna` | low | bib / DOI / 页码 / 作者顺序比对 |
+| `layout_check` 版面与图表 | `gpt-6.1-terra` | medium | 排版、图注、图内文字可读性 |
+| `writing_review` 写作与结构审读 | `gpt-6.2-sol` | medium | 行文、章节结构、读者可理解性 |
 
-**手动派单**：选流水线根 → 填目标文件相对路径 → 选环节 → 派单。后台跑，结果落 `<项目>/.aris/reviews/<时间>-codex-<环节>.md`，面板只读展示上次结果与回复预览。
+旧的「环节」配置（`external.codex.stages`，S1…S6）读配置时会自动按表迁移到任务分类：S1/S2→`format_check`、S3/S4→`routine_review`、S5→`deep_attack`、S6→`writing_review`、`kill_argument`→`deep_attack`。迁移后只写 `external.codex.tasks`，不再保留旧键。
 
-**最近调用**：每次的时间/环节/模型/成败/tokens/耗时，明细在 `.dsh/codex-runs.jsonl`。
+**手动派单**：选流水线根 → 填目标文件相对路径 → 选任务分类 → 派单。后台跑，结果落 `<项目>/.aris/reviews/<时间>-codex-<任务分类>.md`，面板只读展示上次结果与回复预览。
+
+**最近调用**：每次的时间/任务分类/模型/成败/tokens/耗时，明细在 `.dsh/codex-runs.jsonl`（字段名 `task`）。
 
 > **两条不可信**：① 模型自报身份经常是错的（实测 `-m gpt-6-luna` 执行、自报 `gpt-6.2-sol`），以 CLI 首行 `model:` 为准，两者都记；② 默认模型会随账号漂移，所以每次都用 `-m` 钉死，型号从清单里消失就拒单，不静默回退。
 >
@@ -323,14 +329,15 @@ S7_submission 投稿（匿名稿、cover letter、预检）
 
 ```
 prompts → codex.exe exec（stdin 喂提示词，-o 落 stdout 文件）
-        ↓  超时 kill、单飞锁、每小时限额、tokens 记账
-.aris-run/codex/<stamp>-<gate>.task.md   ← 送进去的原文
+        ↓  超时 kill、审核锁（与 Kimi 共用）、每小时限额、tokens 记账
+.aris-run/codex/<stamp>-<任务分类>.task.md   ← 送进去的原文
         ↓
 .aris/reviews/<时间>-slot<N>.md          ← 审稿正文，首行 model/effort 以 CLI 头部为准
 .dsh/codex-runs.jsonl                    ← 每次调用的 model/effort/tokens/耗时/成败
 ```
 
-- 配置在 `bin/aris-review.mjs --via codex`，环节用 `--gate` 选（决定模型与强度），`--model/--effort` 只对这一次生效
+- 配置在 `bin/aris-review.mjs --via codex`，任务分类用 `--task` 选（决定模型与强度，默认 `routine_review`，旧参数 `--gate` 作别名），`--model/--effort` 只对这一次生效
+- **两条通道互斥**：`acquireReviewLock`（`bin/lib/review-lock.mjs`）保证 Kimi 与 GPT 不会同时审同一份稿；锁 TTL：Kimi 6 小时、GPT 单次超时 + 1 分钟
 - 复现旧结论用「按原配置重跑」，读 `codex-runs.jsonl` 里那次的 model/effort；**复现不要揉进日常迭代**，否则失去可比性
 - 不加 Windows 计划任务：只由 DSH 运行期（一轮开始时、或面板手动派单）触发
 
@@ -387,8 +394,9 @@ node bin/aris.mjs set-artifact <字段> <路径|->
 node bin/aris-review.mjs --project <项目> --slots          # 看槽位配置
 node bin/aris-review.mjs --project <项目> --slot 1 --dry-run
 node bin/aris-review.mjs --project <项目> --collect        # 收件
-node bin/aris-review.mjs --project <项目> --slot 1 --via codex --gate S5_experiments
-node bin/aris-review.mjs --project <项目> --slot 1 --via codex --gate S1_formal --model gpt-6-luna --effort low
+node bin/aris-review.mjs --project <项目> --slot 1 --via codex --task routine_review
+node bin/aris-review.mjs --project <项目> --slot 1 --via codex --task deep_attack --model gpt-6.2-astra --effort high
+node bin/aris-review.mjs --project <项目> --slot 1 --via codex --gate S1_formal   # 旧参数名，自动映射任务分类
 
 # 论文与引用
 node bin/paper-build.mjs --project <项目> --all --out build --json
@@ -416,6 +424,9 @@ python .dsh/skills/aris/tools/cx_verify.py --project <项目> --json
 | GPT 外审报「找不到 codex.exe」 | `Get-AppxPackage OpenAI.Codex` 查不到安装位，或应用被卸载/改名 | 面板会显示解析结果；确认 ChatGPT 桌面端还在，必要时把路径写进环境或重装应用 |
 | GPT 外审报 `SEC_E_NO_CREDENTIALS` / 连不上 | 沙箱内 HTTPS 拿不到凭据，或代理没开 | 确认 `127.0.0.1:7897` 在监听；codex 由插件宿主 spawn，不走 tool 沙箱 |
 | GPT 外审报 `orchestrator_helper_exit_nonzero` | `read-only`/`workspace-write` 起不了 shell 辅助进程 | 默认档只喂正文就够；真要读工程才切 `danger-full-access` |
+| 投递/派单被拒：「已有审核在跑：kimi · mailbox_review · …」 | 审核锁被另一条通道占着（单飞规则） | 等它跑完；确认对方进程已死（`<工作区>/.dsh/.review.lock`），可在面板释放锁或删该文件 |
+| GPT 外审报「连续 3 次失败，已自动停摆」 | 保护闸门，避免额度被连续失败烧掉 | 修掉失败原因后在面板重新启用 |
+| GPT 外审报「模型 X 不在本机清单里」 | 钉死的型号已下线（清单会随账号变） | 打开面板「任务分类 → 模型」重新选一个现存型号 |
 | 「连续 3 次失败，已自动停摆」 | 预算文件里失败计数到顶 | 面板恢复后重新派单；先看最近调用里的错误 |
 | 报「模型 X 不在清单内」 | codex 升级后型号改了名（5.6→6 有 upgrades 映射） | 面板「环节→模型」重选；**不要**让它静默回退到默认型号 |
 

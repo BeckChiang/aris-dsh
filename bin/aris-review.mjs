@@ -44,6 +44,10 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, '..');
+
+// 审核单飞锁：Kimi 邮箱与 GPT 外审共用一把锁，同一时刻只允许一条通道在审
+const { acquireReviewLock, releaseReviewLock } = await import('./lib/review-lock.mjs');
+const KIMI_LOCK_TTL_MS = 6 * 3600 * 1000;
 const REF_DIR = path.join(REPO_ROOT, '.dsh', 'skills', 'aris', 'references', 'skills', 'shared-references');
 
 const DEFAULTS = {
@@ -86,7 +90,10 @@ const USAGE = `用法: node bin/aris-review.mjs --project <dir> --target <file.m
   --purge-trash [天数]   清空 <mailbox>/trash/ 里超过 N 天（默认 30）的归档，缺省不动
                          入账成功的请求/回复会被自动移到 trash/<base>/，不再留在 in/out
   --via <name>           覆盖 reviewers[].via：direct | kimi-mailbox | codex
-  --gate <name>          GPT 外审环节名（via=codex 时决定默认模型/强度），默认 S6_writing
+  --task <name>          GPT 外审任务分类（via=codex 时决定默认模型/强度），默认 routine_review
+                         format_check | routine_review | deep_attack | claim_audit |
+                         citation_audit | layout_check | writing_review
+  --gate <name>          旧参数名，等价 --task（流水线阶段名会自动映射到任务分类）
   --effort <level>       GPT 外审思考强度单次覆盖（low|medium|high|xhigh|max|ultra）
   --slots                只列出 reviewer.json 里配好的审查者（slot / via / 后端）后退出
   --reviewer <id>        按 reviewers[].id 指定审查者（默认按 --slot 匹配）
@@ -100,7 +107,7 @@ reviewer.json 支持两种写法（旧写法完全兼容）：
         {"slot":2,"backend":"openai","model":"…","base_url":"…","label":"同机异模型"}
       ]}
      via=kimi-mailbox → 直接走邮箱（等价 --enqueue），不调用任何本地/远端后端；
-     via=codex        → 直接调本机 Codex CLI（GPT 订阅登录）当审查者，模型/强度按环节取
+     via=codex        → 直接调本机 Codex CLI（GPT 订阅登录）当审查者，模型/强度按任务分类取
                         DSH 工作区 .dsh/aris-dashboard.json 的 external.codex.stages，
                         可用 --model / --effort 单次覆盖；受每小时额度闸门约束。
      via 缺省为 direct（就是旧行为）。命令里显式给 --backend/--model/--base-url = 强制直连。
@@ -187,7 +194,7 @@ function resolveConfig(args) {
     slot: args.slot,
     round: args.round,
     requesterFamily: args['requester-family'],
-    gate: args.gate,
+    task: args.task || args.gate,
     effort: args.effort,
   };
   for (const [k, v] of Object.entries(cliMap)) {
@@ -253,8 +260,8 @@ function resolveConfig(args) {
     // GPT 外审：不碰 HTTP，模型/强度由 codex-review 按环节解析
     cfg.backend = 'codex';
     cfg.baseUrl = '-';
-    cfg.gate = String(cfg.gate || 'S6_writing');
-    if (sources.model !== '命令行') cfg.model = '（按环节默认）';
+    cfg.taskKey = String(cfg.task || 'routine_review');
+    if (sources.model !== '命令行') cfg.model = '（按任务分类默认）';
   } else if (cfg.via === 'kimi-mailbox') {
     // 邮箱模式不碰网络，后端字段只作记录（谁真正生成结论由取件人决定，Model 由回复首行自报）
     cfg.backend = 'kimi-mailbox';
@@ -903,6 +910,17 @@ function refsSection(refs) {
 
 function cmdEnqueue(cfg, args, mb, { prompts, target, round }) {
   ensureMailbox(mb);
+  const targetRel = relTo(cfg.project, target.abs);
+  const lock = acquireReviewLock(REPO_ROOT, {
+    channel: 'kimi',
+    task: 'mailbox_review',
+    target: targetRel,
+    ttlMs: KIMI_LOCK_TTL_MS,
+  });
+  if (!lock.ok) {
+    const h = lock.holder || {};
+    fail(`已有审核在跑：${h.channel || '?'} · ${h.task || '?'} · ${h.target || '?'}（${h.ageMs ? Math.round(h.ageMs / 60000) : 0} 分钟前开始）。等它结束或到面板里释放锁再投递。`);
+  }
   const now = new Date();
   let base = `${localStamp(now)}-slot${cfg.slot}`;
   // 同一秒内多次投递时避免文件名互相覆盖
@@ -1175,6 +1193,7 @@ function cmdCollect(cfg, args, mb, only = null) {
     archived.push(file);
   }
 
+  if (ok) releaseReviewLock(REPO_ROOT, 'kimi');
   const moved = archiveProcessed(mb, archived);
   console.log(`\n收件完成：${ok} 条入账，${bad} 条跳过（已收总计 ${processed.size} 条）。`);
   if (moved.length) {
@@ -1325,7 +1344,7 @@ async function reviewViaCodex(cfg, prompts, round) {
   const res = await lib.runCodexReview({
     workspace,
     root: cfg.project,
-    gate: cfg.gate || 'S6_writing',
+    taskKey: cfg.taskKey || 'routine_review',
     task,
     model: overrideModel,
     effort: overrideEffort,
@@ -1423,7 +1442,7 @@ async function main() {
   console.log(`→ 审查 ${relTo(cfg.project, target.abs)}（slot ${cfg.slot} / tier ${cfg.tier} / round ${round}）`);
   console.log(`  backend=${cfg.backend} model=${cfg.model}`
     + (cfg.via === 'codex'
-      ? ` → 本机 Codex CLI（环节 ${cfg.gate || 'S6_writing'}，单次上限见面板）`
+      ? ` → 本机 Codex CLI（任务 ${cfg.taskKey || 'routine_review'}，单次上限见面板）`
       : ` → ${cfg.baseUrl}/chat/completions（超时 ${cfg.timeoutSec}s，失败重试 1 次）`));
 
   let outcome;

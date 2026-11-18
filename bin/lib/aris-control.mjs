@@ -27,7 +27,7 @@ import {
 } from './aris-registry.mjs?v=46';
 import { costView, effectiveInterval, isRunning, kimiIntervalMinutes, nextKimiTick, nextRunAt, pendingReviews, pendingSubmittedAt, preflight, recoverStale, resetPrompt, runOnce, cancelStopIntent, stopPipeline, tick, todayStats } from './aris-runner.mjs?v=47';
 import { resolveDsh } from './aris-dsh.mjs?v=46';
-import { CODEX_STAGES, codexState, listModels, readCodexConfig, runCodexReview, saveCodexConfig } from './codex-review.mjs?v=1';
+import { CODEX_TASKS, codexState, listModels, readCodexConfig, runCodexReview, saveCodexConfig } from './codex-review.mjs?v=2';
 
 const BIN_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -546,7 +546,7 @@ export function describePipeline(workspace, entry, settings) {
 // GPT 外审（via=codex）：面板状态 + 手动派单
 // ---------------------------------------------------------------------------
 
-let codexManual = { running: false, at: null, root: '', gate: '', target: '', result: null, remaining: null, file: '' };
+let codexManual = { running: false, at: null, root: '', task: '', target: '', result: null, remaining: null, file: '' };
 
 function codexSnapshot(workspace) {
   let base;
@@ -555,9 +555,11 @@ function codexSnapshot(workspace) {
   } catch (e) {
     base = { error: String((e && e.message) || e) };
   }
+  const taskDefs = CODEX_TASKS.map((t) => ({ key: t.key, label: t.label, hint: t.hint }));
   return {
     ...base,
-    stageDefs: CODEX_STAGES.map((s) => ({ key: s.key, label: s.label })),
+    taskDefs,
+    stageDefs: taskDefs, // 旧名兼容
     manual: codexManual,
     lastManual: readJsonSafe(path.join(workspace, '.dsh', 'codex-manual-last.json'), null),
   };
@@ -565,6 +567,7 @@ function codexSnapshot(workspace) {
 
 function startCodexRun(workspace, input) {
   if (codexManual.running) return { ok: false, error: '已有一次手动外审在跑，等它结束' };
+  const taskKey = String(input.task || input.taskKey || input.gate || 'routine_review');
   const root = path.resolve(String(input.root || ''));
   if (!existsDir(root)) return { ok: false, error: `项目目录不存在：${root}` };
   const target = path.resolve(root, String(input.target || ''));
@@ -576,7 +579,6 @@ function startCodexRun(workspace, input) {
   } catch {
     return { ok: false, error: `目标文件读不到：${rel}` };
   }
-  const gate = String(input.gate || 'S6_writing');
   const task = [
     `# 稿审派单 · ${rel}`,
     '',
@@ -587,8 +589,8 @@ function startCodexRun(workspace, input) {
     '',
     text,
   ].join('\n');
-  codexManual = { running: true, at: new Date().toISOString(), root, gate, target: rel, result: null, remaining: null, file: '' };
-  runCodexReview({ workspace, root, gate, task, model: input.model, effort: input.effort })
+  codexManual = { running: true, at: new Date().toISOString(), root, task: taskKey, target: rel, result: null, remaining: null, file: '' };
+  runCodexReview({ workspace, root, taskKey, task, model: input.model, effort: input.effort })
     .then((res) => {
       let file = '';
       if (res.ok) {
@@ -596,7 +598,7 @@ function startCodexRun(workspace, input) {
           const dir = path.join(root, '.aris', 'reviews');
           fs.mkdirSync(dir, { recursive: true });
           const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-          file = path.join(dir, `${stamp}-codex-${gate}.md`);
+          file = path.join(dir, `${stamp}-codex-${taskKey}.md`);
           fs.writeFileSync(file, res.text, 'utf8');
         } catch { /* 记录写失败不影响返回 */ }
       }
@@ -611,14 +613,14 @@ function startCodexRun(workspace, input) {
       };
       try {
         writeJsonAtomic(path.join(workspace, '.dsh', 'codex-manual-last.json'), {
-          at: codexManual.at, gate, target: rel, file, ...codexManual.result,
+          at: codexManual.at, task: taskKey, target: rel, file, ...codexManual.result,
         });
       } catch { /* 落盘失败不影响面板 */ }
     })
     .catch((e) => {
       codexManual = { ...codexManual, running: false, result: { ok: false, error: String((e && e.message) || e) } };
     });
-  return { ok: true, started: true, gate, target: rel };
+  return { ok: true, started: true, task: taskKey, target: rel };
 }
 
 function require_verdict(text) {
