@@ -1000,6 +1000,9 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
       const [toast, setToast] = React.useState(null);
       const [tab, setTab] = React.useState('pipes');
       const [newRoot, setNewRoot] = React.useState('');
+      // 人工回复草稿：按 root 存，轮询不会清空
+      const [humanNotes, setHumanNotes] = React.useState({});
+      const setHumanNote = (root, v) => setHumanNotes((prev) => ({ ...prev, [root]: v }));
       const [drawer, setDrawer] = React.useState(null);
       const [kimiMin, setKimiMin] = React.useState('');
       const [kimiStart, setKimiStart] = React.useState('');
@@ -1222,7 +1225,10 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
 
       function HumanBox(props) {
         const p = props.p;
-        const [text, setText] = React.useState('');
+        // 输入内容放在面板层（humanNotes），本组件每轮渲染都会重建，
+        // 用局部 useState 会被 5 秒一次的轮询复位成空。
+        const text = String((props.notes && props.notes[p.root]) || '');
+        const setText = (v) => props.setNote(p.root, v);
         const block = p.plan && p.plan.block ? p.plan.block : null;
         const reason = block ? block.reason : p.blocked || '';
         const hint = block ? block.hint : '';
@@ -1247,8 +1253,8 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
             onChange: (e) => setText(e.target.value),
           }),
           h('div', { className: 'daris-inline' },
-            h(Btn, { label: '提交并批准重启', primary: true, disabled: props.busy || !text.trim(), onClick: () => props.act('human.reply', { root: p.root, text, restart: true }) }),
-            h(Btn, { label: '只留备注', disabled: props.busy || !text.trim(), onClick: () => props.act('human.reply', { root: p.root, text, restart: false }) }),
+            h(Btn, { label: '提交并批准重启', primary: true, disabled: props.busy || !text.trim(), onClick: async () => { const r = await props.act('human.reply', { root: p.root, text, restart: true }); if (r && r.ok) setText(''); } }),
+            h(Btn, { label: '只留备注', disabled: props.busy || !text.trim(), onClick: async () => { const r = await props.act('human.reply', { root: p.root, text, restart: false }); if (r && r.ok) setText(''); } }),
             h(Btn, { label: '复制摘要另开对话', onClick: copy })));
       }
 
@@ -1348,8 +1354,11 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
                 h('div', { className: 'daris-sub' }, '明细与事件在卡片底部，两列并排'))),
             h(Block, { title: '运行数据' },
               h('div', { className: 'daris-facts' },
-                h('div', { className: 'daris-fact' }, h('span', { className: 'daris-k' }, '上轮结论'), h('span', { className: 'daris-v' }, last ? (last.verdict || '已完成') : '—')),
-                h('div', { className: 'daris-fact' }, h('span', { className: 'daris-k' }, '审核结果'), h('span', { className: 'daris-v' }, reviewLine)),
+                h('div', { className: 'daris-fact' }, h('span', { className: 'daris-k' }, '上轮结论'), h('span', { className: 'daris-v' }, last ? `${last.verdict || '已完成'}${last.exit != null ? ` · exit ${last.exit}` : ''}${last.steps ? ` · ${last.steps} 步` : ''}${last.ms ? ` · ${Math.max(1, Math.round(last.ms / 60000))} 分钟` : ''}` : '—')),
+                h('div', { className: 'daris-fact' }, h('span', { className: 'daris-k' }, '上轮结束'), h('span', { className: 'daris-v' }, last && (last.finishedAt || last.at) ? `${ft(last.finishedAt || last.at)} · ${yu(last.cny && last.cny.total)} · ${last.usage && last.usage.total ? `${Math.round(last.usage.total / 1000)}k tokens` : '—'}` : '—')),
+                h('div', { className: 'daris-fact' }, h('span', { className: 'daris-k' }, '审核结果'), h('span', { className: 'daris-v' }, review
+                  ? `${review.verdict || '—'}${review.score != null ? ` ${review.score}/10` : ''}${review.acceptance ? ` · ${review.acceptance}` : ''}${review.must != null ? ` · MUST ${review.must}` : ''} · ${ft(review.at)}${review.scope ? ` · ${review.scope}` : ''}`
+                  : '还没有审查记录')),
                 h('div', { className: 'daris-fact' }, h('span', { className: 'daris-k' }, '最近会话'), h('span', { className: 'daris-v daris-mono', title: p.lastSessionId || '' }, p.lastSessionId || '—')))),
             h(Block, { title: '操作' },
               h('div', { className: 'daris-inline' },
@@ -1379,7 +1388,7 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
                 h(Btn, { label: inWs ? '会话已挂到工作区' : '添加到工作区', title: inWs ? '该根目录已在工作区列表里；点一下把新会话补挂进 second 分组' : '把当前流水线的根目录登记为 DSH 工作区，并把该目录下的会话挂进分组', primary: !inWs, disabled: busy, onClick: async () => { const r = await act('workspace.register', { root: p.root, title: p.name }); if (r) { loadWorkspaces(); setToast(r.created ? '已添加工作区' : '已在工作区，已补挂新会话'); } } }),
                 h(Btn, { label: '移除', danger: true, disabled: busy, onClick: () => act('remove', { root: p.root }) }))),
             h(Block, { title: '每日上限' }, h(LimitsBox, { p, busy, act })),
-            needsHuman ? h(HumanBox, { p, busy, act, toast: setToast }) : null,
+            needsHuman ? h(HumanBox, { p, busy, act, toast: setToast, notes: humanNotes, setNote: setHumanNote }) : null,
             (p.blocked && !needsHuman) || p.lastError
               ? h('div', { className: 'daris-alerts' },
                 p.blocked && !needsHuman ? h(Full, { value: `预检：${p.blocked}` }) : null,
@@ -1397,7 +1406,19 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
 
       let body = null;
       if (tab === 'pipes') {
+        const humanList = (data.reviews && data.reviews.humanActions) || [];
         body = h('div', null,
+          humanList.length
+            ? h('div', { className: 'daris-sec' },
+              h('div', { className: 'daris-sec-t' }, `需要人处理 · ${humanList.length}`),
+              humanList.map((a, i) => h('div', { key: `hm-${i}`, className: 'daris-row', style: { marginTop: 6, flexWrap: 'wrap', alignItems: 'baseline' } },
+                h('span', { className: `daris-tag ${a.level === 'bad' ? 'bad' : 'warn'}`.trim() }, a.level === 'bad' ? '人工' : '注意'),
+                h('span', { className: 'daris-tag' }, a.name || '-'),
+                h('strong', null, a.title),
+                a.detail ? h('span', { className: 'daris-sub', style: { flex: '1 1 320px' } }, a.detail) : null,
+                a.at ? h('span', { className: 'daris-path' }, ft(a.at)) : null,
+                a.file ? h(Btn, { label: '打开清单', onClick: async () => { try { const res = await getArtifactFile(a.name, a.file); setDrawer({ kind: 'file', title: a.title, root: `${a.name}/${a.file}`, text: String((res && res.text) || '（空）') }); } catch (e) { setToast(`打开失败：${String((e && e.message) || e)}`); } } }) : null)))
+            : null,
           h('div', { className: 'daris-sec' },
             h('div', { className: 'daris-sec-t' }, '添加流水线'),
             h('div', { className: 'daris-row' },
@@ -1509,7 +1530,7 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
       const drawerEl = drawer
         ? h('div', { className: 'daris-card', style: { marginTop: 16 } },
             h('div', { className: 'daris-row', style: { justifyContent: 'space-between' } },
-              h('div', { className: 'daris-name' }, drawer.kind === 'prompt' ? '提示词' : drawer.kind === 'session' ? `会话 · ${(drawer.data && drawer.data.title) || (drawer.data && drawer.data.id) || ''}` : `日志 · ${(drawer.data && drawer.data.runId) || ''}`),
+              h('div', { className: 'daris-name' }, drawer.kind === 'prompt' ? '提示词' : drawer.kind === 'session' ? `会话 · ${(drawer.data && drawer.data.title) || (drawer.data && drawer.data.id) || ''}` : drawer.kind === 'file' ? `文件 · ${drawer.title || ''}` : `日志 · ${(drawer.data && drawer.data.runId) || ''}`),
               h('div', { className: 'daris-row' },
                 drawer.kind === 'prompt'
                   ? h(Btn, { label: '保存提示词', primary: true, disabled: busy, onClick: async () => { await act('prompt.set', { root: drawer.root, text: drawer.text }); setDrawer(null); } })
@@ -1518,6 +1539,8 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
             h('div', { className: 'daris-path', style: { margin: '4px 0 8px' } }, drawer.root),
             drawer.kind === 'prompt'
               ? h('textarea', { className: 'daris-input', value: drawer.text, onChange: (e) => setDrawer({ ...drawer, text: e.target.value }) })
+              : drawer.kind === 'file'
+              ? h('pre', { className: 'daris-pre', style: { maxHeight: 420 } }, String(drawer.text || '（空）').slice(0, 20000))
               : drawer.kind === 'session'
               ? sessionEl(drawer.data)
               : h('div', null,

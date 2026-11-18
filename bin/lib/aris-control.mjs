@@ -29,7 +29,7 @@ import { costView, effectiveInterval, isRunning, kimiIntervalMinutes, nextKimiTi
 import { resolveDsh } from './aris-dsh.mjs?v=46';
 import { CODEX_TASKS, codexState, listModels, normalizeWorkspace, previewPrompt, readCodexConfig, runCodexReview, saveCodexConfig, quotaGate } from './codex-review.mjs?v=7';
 import { readProjectSlots, readReviewRoute, routeBlocks, saveReviewRoute } from './review-route.mjs?v=3';
-import { collectReviewResults } from './review-results.mjs?v=3';
+import { collectReviewResults } from './review-results.mjs?v=4';
 import { readSessionTranscript } from './codex-session.mjs';
 
 const BIN_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -225,49 +225,107 @@ function writeHandoff(workspace, patch) {
 
 /** frrs 的总计划：state.states[*].todo 是字符串数组，已完成项以 ✅ 开头。 */
 
-/** 最近一次审查的结论（找 root 下最新的 *.gate.json；找不到就返回 null）。 */
+/** 最近一次审查的结论。优先看 `.aris/reviews/` 的最新结构化记录（GPT 与 Kimi 都落这里），
+ *  没有再退回旧的 `*.gate.json`（那是 python 邮箱桥才写的，GPT 通道不产生）。 */
 const reviewCache = new Map();
+
+function countMustItems(mdFile) {
+  let text = '';
+  try {
+    text = fs.readFileSync(mdFile, 'utf8');
+  } catch {
+    return null;
+  }
+  const head = /^##+\s*(MUST|主要问题)(?=\s|$)/im.exec(text);
+  if (!head) return null;
+  const tail = text.slice(head.index + head[0].length);
+  const next = /^##+\s/im.exec(tail);
+  const body = next ? tail.slice(0, next.index) : tail;
+  return body
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => /^([-*+]|\d+[.)])\s+\S/.test(l)).length;
+}
+
 function lastReview(root) {
   const hit = reviewCache.get(root);
-  if (hit && Date.now() - hit.at < 60_000) return hit.value;
+  if (hit && Date.now() - hit.at < 10_000) return hit.value;
+
+  let value = null;
+  const dir = path.join(root, '.aris', 'reviews');
+  let names = [];
+  try {
+    names = fs.readdirSync(dir).filter((n) => n.endsWith('.json'));
+  } catch {
+    names = [];
+  }
   let best = null;
-  const walk = (dir, depth) => {
-    if (depth > 2) return;
-    let items = [];
-    try {
-      items = fs.readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const it of items) {
-      const full = path.join(dir, it.name);
-      if (it.isDirectory()) {
-        if (it.name === 'node_modules' || it.name === '.git' || it.name === '__pycache__') continue;
-        walk(full, depth + 1);
-      } else if (it.name.endsWith('.gate.json')) {
-        try {
-          const st = fs.statSync(full);
-          if (!best || st.mtimeMs > best.mtimeMs) best = { file: full, mtimeMs: st.mtimeMs };
-        } catch {
-          /* 跳过 */
+  for (const n of names) {
+    const rec = readJsonSafe(path.join(dir, n), null);
+    if (!rec || !rec.verdict) continue;
+    const at = Date.parse(rec.created_at || '') || 0;
+    if (!at) continue;
+    if (!best || at > best.at) best = { at, rec, n };
+  }
+  if (best) {
+    const mdRel = path.join('.aris', 'reviews', best.n.replace(/\.json$/, '.md')).replace(/\\/g, '/');
+    const must = countMustItems(path.join(root, mdRel));
+    value = {
+      file: mdRel,
+      verdict: String(best.rec.verdict || '').toUpperCase(),
+      decision: best.rec.decision || null,
+      acceptance: best.rec.acceptance_status || best.rec.acceptance || null,
+      score: Number.isFinite(Number(best.rec.score)) ? Number(best.rec.score) : null,
+      must,
+      should: null,
+      scope: String(best.rec.scope || (String(best.rec.target || '').match(/review_package_(.+?)_r\d+\.md$/) || [])[1] || ''),
+      channel: /codex/i.test(String(best.rec.backend || '')) ? 'gpt' : /mailbox|kimi/i.test(String(best.rec.backend || '')) ? 'kimi' : '',
+      at: new Date(best.at).toISOString(),
+      source: 'reviews',
+    };
+  }
+
+  if (!value) {
+    let bestGate = null;
+    const walk = (d, depth) => {
+      if (depth > 2) return;
+      let items = [];
+      try {
+        items = fs.readdirSync(d, { withFileTypes: true });
+      } catch {
+        return;
+      }
+      for (const it of items) {
+        const full = path.join(d, it.name);
+        if (it.isDirectory()) {
+          if (it.name === 'node_modules' || it.name === '.git' || it.name === '__pycache__') continue;
+          walk(full, depth + 1);
+        } else if (it.name.endsWith('.gate.json')) {
+          try {
+            const st = fs.statSync(full);
+            if (!bestGate || st.mtimeMs > bestGate.mtimeMs) bestGate = { file: full, mtimeMs: st.mtimeMs };
+          } catch {}
         }
       }
-    }
-  };
-  walk(root, 0);
-  let value = null;
-  if (best) {
-    const g = readJsonSafe(best.file, null);
-    if (g) {
-      value = {
-        file: path.relative(root, best.file),
-        verdict: g.verdict || null,
-        decision: g.decision || null,
-        acceptance: g.acceptance_status || null,
-        must: g.must_count ?? null,
-        should: g.should_count ?? null,
-        at: new Date(best.mtimeMs).toISOString(),
-      };
+    };
+    walk(root, 0);
+    if (bestGate) {
+      const g = readJsonSafe(bestGate.file, null);
+      if (g) {
+        value = {
+          file: path.relative(root, bestGate.file),
+          verdict: g.verdict || null,
+          decision: g.decision || null,
+          acceptance: g.acceptance_status || null,
+          score: null,
+          must: g.must_count ?? null,
+          should: g.should_count ?? null,
+          scope: '',
+          channel: '',
+          at: new Date(bestGate.mtimeMs).toISOString(),
+          source: 'gate',
+        };
+      }
     }
   }
   reviewCache.set(root, { at: Date.now(), value });
@@ -907,6 +965,8 @@ export function snapshot(workspace, config = {}) {
           extra.push({ kind: 'quota', level: 'warn', name: 'GPT 外审', title: '本小时额度用完', detail: `已用 ${gate.used}/${gate.limit}，${String(gate.freeAt).slice(11, 16)} 之后恢复`, at: '', file: '' });
         }
         if (extra.length) rv.humanActions = [...extra, ...(rv.humanActions || [])];
+        // 红色（真要人动手）排前面，琥珀（看着点）在后
+        rv.humanActions.sort((a, b) => (a.level === b.level ? 0 : a.level === 'bad' ? -1 : 1));
       } catch {}
       return rv;
     })(),

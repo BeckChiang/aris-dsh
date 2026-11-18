@@ -117,6 +117,28 @@ function humanActionsOf(workspace, groups) {
         file: cap && cap.human ? cap.human : '',
       });
     }
+    // 流水线自己的阻塞（frrs 的 pipeline/state.json 才是权威；runtime.json 只反映起轮器）
+    let st = null;
+    try {
+      st = JSON.parse(fs.readFileSync(path.join(root, 'pipeline', 'state.json'), 'utf8'));
+    } catch {}
+    if (st && st.block) {
+      const checklist = String(st.block.manual_checklist || st.block.checklist || '');
+      out.push({
+        kind: 'cap',
+        level: 'bad',
+        name,
+        root,
+        title: `审查封顶转人工 · ${st.block.scope || '?'}`,
+        detail: String(st.block.reason || '').replace(/\s+/g, ' ').slice(0, 240),
+        at: st.block.at || st.block.created_at || '',
+        file: checklist,
+        checklist: checklist,
+      });
+    } else if (st && String(st.status || '') === 'blocked_on_user' && !st.block) {
+      out.push({ kind: 'blocked', level: 'bad', name, root, title: '流水线等待人工', detail: 'pipeline/state.json 里 status = blocked_on_user', at: '', file: '' });
+    }
+
     let rt = null;
     try {
       rt = JSON.parse(fs.readFileSync(path.join(root, '.aris-run', 'runtime.json'), 'utf8'));
@@ -138,7 +160,8 @@ function humanActionsOf(workspace, groups) {
     if (latest.verdict === 'reject') {
       out.push({ kind: 'reject', level: 'bad', name: latest.name, root: latest.root, title: `退回：${latest.scope || g.key}`, detail: latest.summary || '审稿人判 reject', at: latest.at, file: latest.rel });
     }
-    if (latest.verdict === 'revise' && g.rounds >= 5) {
+    const capped = out.some((a) => a.kind === 'cap' && a.name === latest.name);
+    if (latest.verdict === 'revise' && g.rounds >= 5 && !capped) {
       out.push({ kind: 'manyrounds', level: 'warn', name: latest.name, root: latest.root, title: `${latest.scope || g.key} 已改 ${g.rounds} 轮`, detail: '同一稿子反复退回，建议人看一眼是不是方向性问题', at: latest.at, file: latest.rel });
     }
   }
