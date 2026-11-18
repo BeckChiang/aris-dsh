@@ -27,7 +27,7 @@ import {
 } from './aris-registry.mjs?v=46';
 import { costView, effectiveInterval, isRunning, kimiIntervalMinutes, nextKimiTick, nextRunAt, pendingReviews, pendingSubmittedAt, preflight, recoverStale, resetPrompt, runOnce, cancelStopIntent, stopPipeline, tick, todayStats } from './aris-runner.mjs?v=47';
 import { resolveDsh } from './aris-dsh.mjs?v=46';
-import { CODEX_TASKS, codexState, listModels, normalizeWorkspace, previewPrompt, readCodexConfig, runCodexReview, saveCodexConfig } from './codex-review.mjs?v=4';
+import { CODEX_TASKS, codexState, listModels, normalizeWorkspace, previewPrompt, readCodexConfig, runCodexReview, saveCodexConfig } from './codex-review.mjs?v=5';
 import { readReviewRoute, routeBlocks, saveReviewRoute } from './review-route.mjs';
 import { collectReviewResults } from './review-results.mjs';
 import { readSessionTranscript } from './codex-session.mjs';
@@ -776,6 +776,29 @@ function require_verdict(text) {
   return m ? m[1].toLowerCase() : 'unknown';
 }
 
+/** 正在跑的流水线名字（切换审核线路前用它拦一下）。 */
+function runningPipelineNames(workspace, config) {
+  try {
+    const settings = readSettings(workspace, config);
+    const registry = readRegistry(workspace);
+    const entries = (Array.isArray(registry) ? registry : registry.projects || [])
+      .filter((e) => e && e.root && existsDir(e.root))
+      .map((e) => ({ ...e, driver: e.driver === 'auto' ? (detectDriver(e.root).driver || 'auto') : e.driver }))
+      .filter((e) => e.driver === 'frrs' || e.driver === 'aris');
+    return entries
+      .filter((e) => {
+        try {
+          return describePipeline(workspace, e, settings).running;
+        } catch {
+          return false;
+        }
+      })
+      .map((e) => e.name || path.basename(e.root));
+  } catch {
+    return [];
+  }
+}
+
 export function snapshot(workspace, config = {}) {
   const settings = readSettings(workspace, config);
   const registry = readRegistry(workspace);
@@ -1053,8 +1076,22 @@ export async function control(workspace, name, input = {}, config = {}) {
       return { ok: true, codex: codexSnapshot(workspace), saved: readCodexConfig(workspace) };
     }
     case 'review.route': {
-      const saved = saveReviewRoute(workspace, (input || {}).channel);
-      return { ok: true, route: saved, dashboard: snapshot(workspace) };
+      const want = String((input || {}).channel || '').trim();
+      const current = readReviewRoute(workspace);
+      if (want && want !== current.channel) {
+        const running = runningPipelineNames(workspace, config);
+        if (running.length) {
+          return {
+            ok: false,
+            blocked: true,
+            error: `流水线「${running.join('、')}」正在运行，运行期间不允许切换审核线路——跑到一半换通道会让同一轮出现两种审稿人。等这一轮结束再改。`,
+            route: current,
+            dashboard: snapshot(workspace, config),
+          };
+        }
+      }
+      const saved = saveReviewRoute(workspace, want);
+      return { ok: true, route: saved, dashboard: snapshot(workspace, config) };
     }
     case 'codex.run': {
       return startCodexRun(workspace, input || {});

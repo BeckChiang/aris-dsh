@@ -644,7 +644,9 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
 
     // 审核线路：明确选一条，另一条会被闸门挡住
     function RouteCard(props) {
-      const { codex, busy, act } = props;
+      const { codex, busy, act, pipes } = props;
+      const runningPipes = (pipes || []).filter((p) => p && p.running).map((p) => p.name);
+      const locked = runningPipes.length > 0;
       const route = (codex && codex.route) || { channel: 'auto', options: [] };
       const opts = route.options && route.options.length ? route.options : [
         { value: 'auto', label: '自动（谁先占锁谁跑）', hint: '' },
@@ -664,10 +666,14 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
               key: o.value,
               label: o.label,
               primary: o.value === route.channel,
-              disabled: busy,
-              onClick: () => act('review.route', { channel: o.value }),
+              disabled: busy || (locked && o.value !== route.channel),
+              onClick: () => { if (locked && o.value !== route.channel) return; act('review.route', { channel: o.value }); },
             }))),
-          h('div', { className: 'daris-sub', style: { marginTop: 8 } }, cur.hint || '')));
+          h('div', { className: 'daris-sub', style: { marginTop: 8 } }, cur.hint || ''),
+          locked
+            ? h('div', { className: 'daris-err', style: { marginTop: 6 } },
+              `流水线「${runningPipes.join('、')}」正在运行，运行期间审核线路锁定，不能切换——跑到一半换通道会让同一轮出现两种审稿人。等这一轮结束再改。`)
+            : null));
     }
 
     function GptReviewCards(props) {
@@ -766,6 +772,28 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
       const saveChannel = h('div', { className: 'daris-row', style: { marginTop: 10 } },
         h(Btn, { label: '保存通道设置', primary: true, disabled: busy, onClick: () => save({ hourlyLimit: Number(c.hourlyLimit) || 4, dailyLimit: Number(c.dailyLimit) || 0, timeoutMinutes: Number(c.timeoutMinutes) || 8, proxy: String(c.proxy || ''), sandboxMode: c.sandboxMode || 'read-only' }) }));
 
+      const quota = codex.quota || {};
+      const quotaWin = (w) => {
+        const used = Math.round(w.usedPercent);
+        const reset = w.resetsInMinutes == null
+          ? ''
+          : (w.resetsInMinutes >= 120 ? ` · ${Math.round(w.resetsInMinutes / 60)} 小时后重置` : ` · ${Math.max(0, w.resetsInMinutes)} 分钟后重置`);
+        return `${w.label} 已用 ${used}%${reset}`;
+      };
+      const quotaRow = h('div', { className: 'daris-row', style: { marginTop: 8 } },
+        h('span', { className: 'daris-k' }, '订阅额度'),
+        quota.ok && quota.plan ? h('span', { className: 'daris-tag' }, `计划 ${quota.plan}`) : null,
+        quota.ok
+          ? (quota.windows || []).map((w) => h('span', {
+            key: w.key,
+            className: w.usedPercent >= 90 ? 'daris-tag bad' : (w.usedPercent >= 70 ? 'daris-tag warn' : 'daris-tag ok'),
+          }, quotaWin(w)))
+          : h('span', { className: 'daris-tag' }, quota.error || '额度不可得（还没跑过派单）'),
+        quota.ok
+          ? h('span', { className: 'daris-tag' + (quota.stale ? ' warn' : '') },
+            quota.ageMinutes == null ? '' : `取自 ${quota.ageMinutes} 分钟前那次派单${quota.stale ? '（可能已过期）' : ''}`)
+          : null);
+
       const g1 = h(Group, {
         title: 'GPT 外审通道 · 状态与额度',
         sub: '本机 ChatGPT 桌面端的 Codex CLI（订阅登录，不另付费）。额度共用订阅，所以闸门在派单前生效：超限直接拒，不静默降级。',
@@ -773,6 +801,7 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
       },
         h('div', null,
           statusRow,
+          quotaRow,
           h('div', { className: 'daris-path', style: { marginTop: 6 } }, codex.exe || '（未解析到 codex.exe）'),
           h('div', { className: 'daris-tag', style: { marginTop: 6 } }, `会话库 ~/.codex/sessions 现占 ${((nSessions.bytes || 0) / 1048576).toFixed(2)} MB、${nSessions.files || 0} 个文件（默认只报体积，不自动删）`),
           budgetFields,
@@ -1324,7 +1353,7 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
           ? `运行中：${lock.channel} · ${lock.task || '-'} · ${lock.target || '-'}`
           : '当前空闲';
         body = h('div', null,
-          h(RouteCard, { codex: data.codex, busy, act }),
+          h(RouteCard, { codex: data.codex, busy, act, pipes: data.pipelines || [] }),
           h(ReviewResults, { reviews: data.reviews }),
           h(Group, {
             title: '审核锁 · 同一时刻只跑一条',

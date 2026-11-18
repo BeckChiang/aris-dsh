@@ -9,6 +9,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import { acquireReviewLock, inspectReviewLock, releaseReviewLock, reviewLockFile } from './review-lock.mjs';
+import { readCodexQuota } from './codex-quota.mjs';
 import { readReviewRoute, routeBlocks } from './review-route.mjs';
 
 export const CODEX_HOME = path.join(os.homedir(), '.codex');
@@ -800,8 +801,15 @@ export function codexState(workspace) {
     recent = [];
   }
   const taskDefs = CODEX_TASKS.map((t) => ({ key: t.key, label: t.label, hint: t.hint }));
+  let quota = null;
+  try {
+    quota = readCodexQuota();
+  } catch (e) {
+    quota = { ok: false, error: String((e && e.message) || e) };
+  }
   return {
     route: readReviewRoute(workspace),
+    quota,
     config: cfg,
     taskDefs,
     stageDefs: taskDefs, // 旧名兼容
