@@ -201,6 +201,9 @@ export const CODEX_DEFAULTS = {
   proxy: 'http://127.0.0.1:7897',
   maxChars: 250000, // 单稿上限（Astra 只有 272k 上下文，这里取保守值）
   sandboxMode: 'read-only', // read-only=只读正文（安全）| danger-full-access=允许它自己翻仓库
+  // Windows 沙箱后端：elevated 要建机器级账户与网络规则（每次失效都会弹提权/安装），
+  // 我们只喂正文、不让它执行命令，用 unelevated 就够，且不会再触发那个安装提示。
+  windowsSandbox: 'unelevated',
   workspace: { mode: 'root', path: '' }, // -C 指向哪里，同时决定 ChatGPT 续聊的视野
   prompt: { ...PROMPT_DEFAULTS }, // 面板可编辑的两段模板
   cleanCopy: true, // 隔离副本模式跑完即清
@@ -280,7 +283,7 @@ export function readCodexConfig(workspace) {
 export function saveCodexConfig(workspace, patch = {}) {
   const raw = readJsonSafe(settingsFile(workspace), {}) || {};
   const ext = { ...((raw.external && raw.external.codex) || {}) };
-  for (const key of ['enabled', 'hourlyLimit', 'dailyLimit', 'timeoutMinutes', 'proxy', 'maxChars', 'sandboxMode', 'cleanCopy']) {
+  for (const key of ['enabled', 'hourlyLimit', 'dailyLimit', 'timeoutMinutes', 'proxy', 'maxChars', 'sandboxMode', 'windowsSandbox', 'cleanCopy']) {
     if (patch[key] != null) ext[key] = patch[key];
   }
   if (patch.prompt && typeof patch.prompt === 'object') {
@@ -575,6 +578,7 @@ export async function runCodexReview(input) {
     'exec',
     '--skip-git-repo-check',
     '--sandbox', sandbox,
+    '-c', `windows.sandbox=${cfg.windowsSandbox || 'unelevated'}`,
     '--json',
     '--color', 'never',
     '-C', cwd,
