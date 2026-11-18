@@ -62,6 +62,89 @@ function parseManualMd(file) {
   };
 }
 
+// 从 `dataset_gen/review_package_gold_r5.md` 里取 scope 与回合数
+function parseTarget(target) {
+  const base = String(target || '').replace(/\\/g, '/').split('/').pop();
+  const m = /^review_package_(.+?)_r(\d+)\.md$/i.exec(base);
+  if (!m) return { scope: '', round: 0 };
+  return { scope: m[1], round: Number(m[2]) };
+}
+
+// 从审稿 md 里抠 `## MUST` 段的前几条，给「需要人处理」用
+function mustLines(file, max = 4) {
+  let text = '';
+  try {
+    text = fs.readFileSync(file, 'utf8');
+  } catch {
+    return [];
+  }
+  const seg =
+    (/^##+\s*MUST\b([\s\S]*?)(?=^##+\s|\Z)/im.exec(text) || [])[1] ||
+    (/^##+\s*主要问题\s*\n([\s\S]*?)(?=^##+\s|\Z)/im.exec(text) || [])[1] ||
+    (/^##+\s*结论\s*\n([\s\S]*?)(?=^##+\s|\Z)/im.exec(text) || [])[1] ||
+    '';
+  return seg
+    .split('\n')
+    .map((l) => l.replace(/^\s*(?:[-*]|\d+[.)])\s*/, '').trim())
+    .filter((l) => l && !/^```/.test(l))
+    .slice(0, max);
+}
+
+// 需要人处理的事：封顶转人工、状态机 blocked_on_user、连败停摆、退回
+function humanActionsOf(workspace, groups) {
+  const out = [];
+  const entries = readRegistry(workspace) || [];
+  for (const entry of entries) {
+    const root = entry && entry.root;
+    if (!root) continue;
+    const name = entry.name || path.basename(root);
+    const capFile = path.join(root, '.aris', 'review-cap.json');
+    if (fs.existsSync(capFile)) {
+      let cap = null;
+      try {
+        cap = JSON.parse(fs.readFileSync(capFile, 'utf8'));
+      } catch {}
+      out.push({
+        kind: 'cap',
+        level: 'bad',
+        name,
+        root,
+        title: '审查封顶，转人工',
+        detail: cap
+          ? `${cap.scope || '?'} 已送审 ${cap.used || '?'}/${cap.cap || '?'} 次仍未通过`
+          : '同一稿子送审次数到顶仍未通过',
+        at: (cap && cap.at) || '',
+        file: cap && cap.human ? cap.human : '',
+      });
+    }
+    let rt = null;
+    try {
+      rt = JSON.parse(fs.readFileSync(path.join(root, '.aris-run', 'runtime.json'), 'utf8'));
+    } catch {}
+    if (rt && rt.status === 'blocked_on_user') {
+      out.push({ kind: 'blocked', level: 'bad', name, root, title: '流水线等待人工', detail: rt.blockedReason || rt.note || 'state 置为 blocked_on_user', at: rt.updatedAt || rt.at || '', file: '' });
+    }
+    let cfg = null;
+    try {
+      cfg = JSON.parse(fs.readFileSync(path.join(root, '.aris-run', 'config.json'), 'utf8'));
+    } catch {}
+    if (cfg && cfg.enabled === false && (!rt || rt.status !== 'running')) {
+      out.push({ kind: 'stopped', level: 'warn', name, root, title: '流水线已停用', detail: '自动起轮关闭，需要人决定是否恢复', at: '', file: '' });
+    }
+  }
+  for (const g of groups) {
+    const latest = g.latest;
+    if (!latest) continue;
+    if (latest.verdict === 'reject') {
+      out.push({ kind: 'reject', level: 'bad', name: latest.name, root: latest.root, title: `退回：${latest.scope || g.key}`, detail: latest.summary || '审稿人判 reject', at: latest.at, file: latest.rel });
+    }
+    if (latest.verdict === 'revise' && g.rounds >= 5) {
+      out.push({ kind: 'manyrounds', level: 'warn', name: latest.name, root: latest.root, title: `${latest.scope || g.key} 已改 ${g.rounds} 轮`, detail: '同一稿子反复退回，建议人看一眼是不是方向性问题', at: latest.at, file: latest.rel });
+    }
+  }
+  return out;
+}
+
 /** 汇总全部流水线的审稿结果，按时间倒序。 */
 export function collectReviewResults(workspace, opts = {}) {
   const limit = Number(opts.limit) > 0 ? Number(opts.limit) : 100;
@@ -93,6 +176,7 @@ export function collectReviewResults(workspace, opts = {}) {
         }
         if (!rec || !rec.verdict) continue;
         const manual = parseManualName(file.replace(/\.json$/i, '.md'));
+        const tgt = parseTarget(rec.target);
         items.push({
           key: `json:${abs}`,
           at: rec.created_at || '',
@@ -112,7 +196,9 @@ export function collectReviewResults(workspace, opts = {}) {
           task: manual.task || '',
           slot: rec.slot || 0,
           tier: rec.tier || '',
-          round: rec.round || 0,
+          round: rec.round || tgt.round || 0,
+          scope: tgt.scope || '',
+          target: rec.target || '',
           source: 'json',
         });
         continue;
@@ -146,28 +232,89 @@ export function collectReviewResults(workspace, opts = {}) {
         slot: 0,
         tier: '',
         round: 0,
+        scope: '',
+        target: '',
         source: 'md',
       });
     }
   }
 
   items.sort((a, b) => (b.atMs || 0) - (a.atMs || 0));
+
+  // 按「项目 + scope」归组：一份稿子的多轮审核 = 一个组，只有最新一轮是待办
+  const buckets = new Map();
+  for (const it of items) {
+    const fallback = String(it.target || it.task || '').replace(/^.*\//, '').replace(/_r\d+\.md$/i, '').replace(/\.md$/i, '');
+    const key = `${it.name}|${it.scope || fallback || ''}`;
+    if (!buckets.has(key)) buckets.set(key, []);
+    buckets.get(key).push(it);
+  }
+  const groups = [];
+  for (const [key, list] of buckets) {
+    list.sort((a, b) => (b.atMs || 0) - (a.atMs || 0));
+    const latest = list[0];
+    const rounds = Math.max(...list.map((x) => x.round || 0), list.length);
+    // 只给「最新且未通过」的那条抠 MUST，免得读一堆历史文件
+    let must = [];
+    if (latest.verdict === 'revise' || latest.verdict === 'reject') {
+      must = mustLines(path.join(latest.root, latest.mdRel || latest.rel));
+    }
+    groups.push({
+      key,
+      name: latest.name,
+      project: latest.project,
+      root: latest.root,
+      scope: latest.scope || latest.task || '',
+      latest,
+      rounds,
+      history: list.slice(1),
+      latestCount: list.length,
+      must,
+    });
+  }
+  groups.sort((a, b) => (b.latest.atMs || 0) - (a.latest.atMs || 0));
+
+  const latestItems = groups.map((g) => g.latest);
+  const historyItems = items.filter((it) => !latestItems.includes(it));
+
   const byVerdict = { accept: 0, revise: 0, reject: 0, unknown: 0 };
   const byChannel = { kimi: 0, gpt: 0, direct: 0, other: 0 };
   for (const it of items) {
     byVerdict[it.verdict] = (byVerdict[it.verdict] || 0) + 1;
     byChannel[it.channel] = (byChannel[it.channel] || 0) + 1;
   }
-  const latest = items.find((it) => it.verdict !== 'unknown') || items[0] || null;
+  // 最新一轮的口径：这才是「现在欠几件」
+  const byLatest = { accept: 0, revise: 0, reject: 0, unknown: 0 };
+  for (const it of latestItems) byLatest[it.verdict] = (byLatest[it.verdict] || 0) + 1;
+
+  const humanActions = humanActionsOf(workspace, groups);
+  humanActions.sort((a, b) => (a.level === b.level ? 0 : a.level === 'bad' ? -1 : 1));
+
+  const latest = latestItems.find((it) => it.verdict !== 'unknown') || latestItems[0] || null;
+  const ordered = [...groups.map((g) => g.latest), ...historyItems].slice(0, limit);
 
   return {
     total: items.length,
     byVerdict,
     byChannel,
+    byLatest,
+    groups: groups.map((g) => ({
+      key: g.key,
+      name: g.name,
+      project: g.project,
+      scope: g.scope,
+      rounds: g.rounds,
+      historyCount: g.history.length,
+      latest: g.latest,
+      must: g.must,
+      history: g.history.slice(0, 20),
+    })),
+    latestTotal: latestItems.length,
+    humanActions,
     latest: latest
       ? { at: latest.at, name: latest.name, channel: latest.channel, verdict: latest.verdict, score: latest.score, rel: latest.rel }
       : null,
-    items: items.slice(0, limit),
+    items: ordered,
     truncated: items.length > limit,
   };
 }

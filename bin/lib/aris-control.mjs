@@ -29,7 +29,7 @@ import { costView, effectiveInterval, isRunning, kimiIntervalMinutes, nextKimiTi
 import { resolveDsh } from './aris-dsh.mjs?v=46';
 import { CODEX_TASKS, codexState, listModels, normalizeWorkspace, previewPrompt, readCodexConfig, runCodexReview, saveCodexConfig, quotaGate } from './codex-review.mjs?v=7';
 import { readProjectSlots, readReviewRoute, routeBlocks, saveReviewRoute } from './review-route.mjs?v=3';
-import { collectReviewResults } from './review-results.mjs?v=2';
+import { collectReviewResults } from './review-results.mjs?v=3';
 import { readSessionTranscript } from './codex-session.mjs';
 
 const BIN_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -894,7 +894,22 @@ export function snapshot(workspace, config = {}) {
       return { kind: d.kind, file: d.file };
     })(),
     codex: codexSnapshot(workspace),
-    reviews: collectReviewResults(workspace),
+    reviews: (() => {
+      const rv = collectReviewResults(workspace);
+      // 通道侧的「要人管」也并进同一张清单：额度用完 / 连续失败停摆
+      try {
+        const cx = codexState(workspace);
+        const gate = cx && cx.quotaGate;
+        const extra = [];
+        if (gate && gate.blocked && /连续\s*3\s*次失败/.test(String(gate.reason || ''))) {
+          extra.push({ kind: 'failures', level: 'bad', name: 'GPT 外审', title: '连续失败已停摆', detail: gate.reason, at: '', file: '' });
+        } else if (gate && gate.blocked && gate.freeAt) {
+          extra.push({ kind: 'quota', level: 'warn', name: 'GPT 外审', title: '本小时额度用完', detail: `已用 ${gate.used}/${gate.limit}，${String(gate.freeAt).slice(11, 16)} 之后恢复`, at: '', file: '' });
+        }
+        if (extra.length) rv.humanActions = [...extra, ...(rv.humanActions || [])];
+      } catch {}
+      return rv;
+    })(),
     pipelines,
     running,
     mailbox: mailboxState(settings.mailbox),

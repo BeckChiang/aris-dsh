@@ -571,18 +571,28 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
     // 审核结果：两条通道的审稿产物按结论分类，集中在一处看
     function ReviewResults(props) {
       const { reviews } = props;
-      const rv = reviews || { total: 0, items: [], byVerdict: {}, byChannel: {} };
+      const rv = reviews || { total: 0, groups: [], byLatest: {}, humanActions: [] };
+      const groups = rv.groups || [];
+      const latestCounts = rv.byLatest || { accept: 0, revise: 0, reject: 0, unknown: 0 };
+      const human = rv.humanActions || [];
       const [verdict, setVerdict] = React.useState('all');
       const [channel, setChannel] = React.useState('all');
       const [openKey, setOpenKey] = React.useState('');
+      const [histKey, setHistKey] = React.useState('');
       const [texts, setTexts] = React.useState({});
       const [err, setErr] = React.useState('');
       const VERD = [['all', '全部'], ['accept', '通过'], ['revise', '待修'], ['reject', '退回'], ['unknown', '未判定']];
       const CH = [['all', '两条通道'], ['kimi', 'Kimi'], ['gpt', 'GPT'], ['other', '未标注']];
-      const count = (map, k) => (k === 'all' ? rv.total || 0 : (map || {})[k] || 0);
-      const items = (rv.items || []).filter((it) => (verdict === 'all' || it.verdict === verdict) && (channel === 'all' || it.channel === channel));
-      const openOne = async (it) => {
-        const key = it.key || it.rel;
+      const chCount = (c) => (c === 'all' ? groups.length : groups.filter((g) => g.latest && g.latest.channel === c).length);
+      const shown = groups.filter((g) => {
+        const l = g.latest || {};
+        if (verdict !== 'all' && l.verdict !== verdict) return false;
+        if (channel !== 'all' && l.channel !== channel) return false;
+        return true;
+      });
+      const load = async (g) => {
+        const it = g.latest || {};
+        const key = g.key;
         if (openKey === key) { setOpenKey(''); return; }
         setOpenKey(key);
         if (texts[key] || !it.name || !(it.mdRel || it.rel)) return;
@@ -593,53 +603,88 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
           setErr(String((e && e.message) || e));
         }
       };
+      const toneOf = (v) => (v === 'accept' ? 'ok' : v === 'reject' ? 'bad' : v === 'revise' ? 'warn' : '');
+      const statRow = h('div', { className: 'daris-row', style: { marginTop: 4, flexWrap: 'wrap' } },
+        h('span', { className: `daris-tag ${human.length ? 'bad' : 'ok'}`.trim() }, `需人工 ${human.length}`),
+        h('span', { className: 'daris-tag warn' }, `当前待修 ${latestCounts.revise || 0} 个 scope`),
+        h('span', { className: 'daris-tag ok' }, `已通过 ${latestCounts.accept || 0}`),
+        h('span', { className: 'daris-tag' }, `稿件 ${groups.length} 份 / 记录 ${rv.total || 0} 条`));
+      const humanBlock = human.length
+        ? h('div', { style: { marginTop: 10 } },
+          h('div', { className: 'daris-sub' }, '需要人处理（机器不会自己往下走）'),
+          human.map((a, i) => h('div', { key: `h-${i}`, className: 'daris-row', style: { marginTop: 6, flexWrap: 'wrap' } },
+            h('span', { className: `daris-tag ${a.level === 'bad' ? 'bad' : 'warn'}`.trim() }, a.level === 'bad' ? '人工' : '注意'),
+            h('span', { className: 'daris-tag' }, a.name || '-'),
+            h('strong', null, a.title),
+            a.detail ? h('span', { className: 'daris-sub' }, a.detail) : null,
+            a.at ? h('span', { className: 'daris-path' }, ft(a.at)) : null)))
+        : h('div', { className: 'daris-tag ok', style: { marginTop: 8 } }, '没有需要人处理的项。');
+      const filters = h('div', null,
+        h('div', { className: 'daris-row', style: { marginTop: 6, flexWrap: 'wrap' } },
+          VERD.map(([v, label]) => h(Btn, {
+            key: `v-${v}`,
+            label: `${label} ${v === 'all' ? groups.length : (latestCounts[v] || 0)}`,
+            primary: verdict === v,
+            onClick: () => setVerdict(v),
+          }))),
+        h('div', { className: 'daris-row', style: { marginTop: 6, flexWrap: 'wrap' } },
+          CH.map(([c, label]) => h(Btn, {
+            key: `c-${c}`,
+            label: `${label} ${chCount(c)}`,
+            primary: channel === c,
+            onClick: () => setChannel(c),
+          }))));
+      const rows = shown.length
+        ? shown.map((g) => {
+          const it = g.latest || {};
+          const key = g.key;
+          const open = openKey === key;
+          const histOpen = histKey === key;
+          const headTags = [
+            h('span', { key: 't', className: 'daris-tag' }, `${open ? '▾' : '▸'} ${ft(it.at)}`),
+            h('span', { key: 'n', className: 'daris-tag' }, it.name || g.project || '-'),
+            g.scope ? h('span', { key: 's', className: 'daris-tag' }, g.scope) : null,
+            h('span', { key: 'v', className: `daris-tag ${toneOf(it.verdict)}`.trim() }, it.verdict),
+            it.score != null ? h('span', { key: 'sc', className: 'daris-tag' }, `${it.score}/10`) : null,
+            h('span', { key: 'r', className: 'daris-tag' }, `第 ${g.rounds} 轮` + (g.historyCount ? ` · 历史 ${g.historyCount} 条` : '')),
+            h('span', { key: 'c', className: 'daris-tag' }, it.channel === 'gpt' ? 'GPT' : it.channel === 'kimi' ? 'Kimi' : (it.channel || '-')),
+            it.model ? h('span', { key: 'm', className: 'daris-path' }, it.model) : null,
+          ].filter(Boolean);
+          const body = open
+            ? h('div', { style: { marginTop: 6 } },
+              it.summary ? h('div', { className: 'daris-sub' }, it.summary) : null,
+              (g.must && g.must.length)
+                ? h('div', { style: { marginTop: 6 } },
+                  h('div', { className: 'daris-sub' }, `必须解决（${g.must.length} 条）`),
+                  g.must.map((m, i) => h('div', { key: `m-${i}`, className: 'daris-path' }, `· ${m}`)))
+                : null,
+              h('div', { className: 'daris-row', style: { marginTop: 6, flexWrap: 'wrap' } },
+                h(Btn, { label: histOpen ? '收起历史' : `历史 ${g.historyCount} 条`, onClick: () => setHistKey(histOpen ? '' : key) }),
+                it.mdRel || it.rel ? h('span', { className: 'daris-path' }, `${it.name || ''}/${it.mdRel || it.rel}`) : null),
+              histOpen
+                ? (g.history || []).map((hj, i) => h('div', { key: `hj-${i}`, className: 'daris-row', style: { marginTop: 4, flexWrap: 'wrap' } },
+                  h('span', { className: 'daris-tag' }, ft(hj.at)),
+                  h('span', { className: `daris-tag ${toneOf(hj.verdict)}`.trim() }, hj.verdict),
+                  hj.score != null ? h('span', { className: 'daris-tag' }, `${hj.score}/10`) : null,
+                  h('span', { className: 'daris-tag' }, `第 ${hj.round || '-'} 轮`)))
+                : null,
+              texts[key]
+                ? h('pre', { className: 'daris-pre', style: { maxHeight: 340 } }, texts[key].slice(0, 6000))
+                : null)
+            : null;
+          return h('div', { key, style: { marginTop: 8 } },
+            h('div', { className: 'daris-row', style: { cursor: 'pointer', flexWrap: 'wrap' }, onClick: () => load(g) }, headTags),
+            body);
+        })
+        : [h('div', { key: 'empty', className: 'daris-tag', style: { marginTop: 8 } }, '没有符合筛选的稿件。')];
       return h(Group, {
-        title: '审核结果 · 按结论分类',
-        sub: '两条通道的审稿产物都汇总在这里（各流水线 .aris/reviews/）：先按结论筛，再按通道筛；点一行展开摘要与原文。',
-        badge: `共 ${rv.total || 0} 份`,
+        title: '审核结果 · 每份稿子只看最新一轮',
+        sub: '一份稿子改几轮就有几条记录，这里按「项目 + scope」归并，只把最新一轮摆出来；旧轮次点开可见。「需要人处理」只列机器自己不会再推进的事。',
+        badge: human.length ? `需人工 ${human.length}` : `${groups.length} 份稿件`,
         defaultOpen: true,
       },
-        h('div', null,
-          h('div', { className: 'daris-row', style: { marginTop: 6, flexWrap: 'wrap' } },
-            VERD.map(([v, label]) => h(Btn, {
-              key: `v-${v}`,
-              label: `${label} ${count(rv.byVerdict, v)}`,
-              primary: verdict === v,
-              onClick: () => setVerdict(v),
-            }))),
-          h('div', { className: 'daris-row', style: { marginTop: 6, flexWrap: 'wrap' } },
-            CH.map(([c, label]) => h(Btn, {
-              key: `c-${c}`,
-              label: `${label} ${count(rv.byChannel, c)}`,
-              primary: channel === c,
-              onClick: () => setChannel(c),
-            }))),
-          err ? h('div', { className: 'daris-err', style: { marginTop: 8 } }, err) : null,
-          items.length
-            ? items.map((it) => {
-              const key = it.key || it.rel;
-              const open = openKey === key;
-              const tone = it.verdict === 'accept' ? 'ok' : it.verdict === 'reject' ? 'bad' : it.verdict === 'revise' ? 'warn' : '';
-              return h('div', { key, style: { marginTop: 8 } },
-                h('div', { className: 'daris-row', style: { cursor: 'pointer', flexWrap: 'wrap' }, onClick: () => openOne(it) },
-                  h('span', { className: 'daris-tag' }, `${open ? '▾' : '▸'} ${ft(it.at)}`),
-                  h('span', { className: 'daris-tag' }, it.name || it.project || '-'),
-                  h('span', { className: 'daris-tag' }, it.channel === 'gpt' ? 'GPT' : it.channel === 'kimi' ? 'Kimi' : (it.channel || '-')),
-                  h('span', { className: `daris-tag ${tone}`.trim() }, it.verdict),
-                  it.score != null ? h('span', { className: 'daris-tag' }, `${it.score}/10`) : null,
-                  it.task ? h('span', { className: 'daris-tag' }, it.task) : null,
-                  it.model ? h('span', { className: 'daris-path' }, it.model) : null),
-                open
-                  ? h('div', { style: { marginTop: 6 } },
-                    it.summary ? h('div', { className: 'daris-sub' }, it.summary) : null,
-                    it.mdRel || it.rel ? h('div', { className: 'daris-path', style: { marginTop: 4 } }, `${it.name || ''}/${it.mdRel || it.rel}`) : null,
-                    texts[key]
-                      ? h('pre', { className: 'daris-pre', style: { maxHeight: 340 } }, texts[key].slice(0, 6000))
-                      : h('div', { className: 'daris-tag', style: { marginTop: 6 } }, '正在读取原文…'))
-                  : null);
-            })
-            : h('div', { className: 'daris-tag', style: { marginTop: 8 } }, '没有符合筛选的审稿记录。'),
-          rv.truncated ? h('div', { className: 'daris-tag', style: { marginTop: 8 } }, '只显示最近 100 份，完整清单在各自 .aris/reviews/') : null));
+        h('div', null, statRow, humanBlock, filters, err ? h('div', { className: 'daris-err', style: { marginTop: 8 } }, err) : null, h('div', null, rows),
+          rv.truncated ? h('div', { className: 'daris-tag', style: { marginTop: 8 } }, '只显示最近 100 条，完整清单在各自 .aris/reviews/') : null));
     }
 
     // 审核线路：明确选一条，另一条会被闸门挡住
