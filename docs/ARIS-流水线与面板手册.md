@@ -160,7 +160,7 @@ Kimi 邮箱与 GPT 外审是同一件事的两条通道，所以放在一页，�
 2. **审核结果**（默认展开）— 两条通道的历史审稿按结论分类，一屏看完
 3. **审核锁** — 同一时刻只跑一条的证据与锁文件位置
 4. **Kimi 邮箱通道** — 执行权、邮箱待办、取件节奏、取件提示词
-5. **GPT 外审通道 / 任务分类 / 手动派单 / 最近调用 / 说明**（详见 3.5）
+5. **GPT 外审：通道（状态+额度）/ 派单工作区 / 送审提示词 / 任务分类 / 手动派单 / 最近调用 / 说明**（详见 3.5）
 
 - **审核线路**：三选一，写在 `<工作区>/.dsh/aris-dashboard.json` 的 `external.review.channel`
   - `auto`：两条都开放，谁先占锁谁跑（默认）
@@ -200,15 +200,17 @@ Kimi 邮箱与 GPT 外审是同一件事的两条通道，所以放在一页，�
 
 不另开 API key，直接用这台机器上装好的 Codex/ChatGPT 桌面端（订阅登录）当第三个审稿族。以下卡片都折叠在审核页里，点标题展开。
 
-**通道卡**
+**通道卡（状态与启停分开）**
 | 字段 | 含义 | 默认 |
 |---|---|---|
-| 启用 GPT 外审 | 总开关，关掉后所有派单一律拒 | 关 |
+| 状态徽标 | `● 已启用`（绿）/ `○ 已停用`（灰）——只表示当前状态，不可点 | — |
+| 启用 / 停用 | 独立按钮，点一下切换 `external.codex.enabled`，关掉后所有派单一律拒 | 关 |
 | 每小时上限 | 滑动 60 分钟内的调用次数上限 | 4 |
 | 每日上限 | `0` = 不限 | 0 |
 | 单次超时 | 超时即 kill | 8 分钟 |
 | 代理 | codex 走 HTTPS，直连 chatgpt.com 不通 | `http://127.0.0.1:7897` |
-| 沙箱 | `read-only` 只把正文喂进去；`danger-full-access` 才让它自己读工程 | `read-only` |
+| 沙箱 | `read-only` 只把送审材料喂进去；`danger-full-access` 才让它自己读工程 | `read-only` |
+| 会话库占用 | `~/.codex/sessions` 的文件数与体积；**只报不删**，要清自己动手 | — |
 
 - **`codex.exe` 是否找到**：`WindowsApps` 目录不可枚举（EPERM），所以走 `Get-AppxPackage OpenAI.Codex` 取安装位；版本升级后自动跟到新目录
 - **本小时剩余 / 连续失败**：口径与预算文件 `.dsh/codex-budget.json` 一致；连续失败 3 次自动停摆，需在面板手动恢复
@@ -228,13 +230,45 @@ Kimi 邮箱与 GPT 外审是同一件事的两条通道，所以放在一页，�
 
 旧的「环节」配置（`external.codex.stages`，S1…S6）读配置时会自动按表迁移到任务分类：S1/S2→`format_check`、S3/S4→`routine_review`、S5→`deep_attack`、S6→`writing_review`、`kill_argument`→`deep_attack`。迁移后只写 `external.codex.tasks`，不再保留旧键。
 
-**手动派单**：选流水线根 → 填目标文件相对路径 → 选任务分类 → 派单。后台跑，结果落 `<项目>/.aris/reviews/<时间>-codex-<任务分类>.md`，面板只读展示上次结果与回复预览。
+**派单工作区**：决定 `-C` 指向哪，也就决定 ChatGPT 续聊时还能看到什么。
 
-**最近调用**：每次的时间/任务分类/模型/成败/tokens/耗时，明细在 `.dsh/codex-runs.jsonl`（字段名 `task`）。
+| 模式 | `-C` 指向 | 续聊视野 | 用途 |
+|---|---|---|---|
+| `root` 项目根（默认） | 项目根 | 整个项目 | 常规审稿，材料分散在多个目录 |
+| `subdir` 指定子目录 | `<项目根>/<子目录>` | 只有该子目录 | 只审 `dataset_gen/` 这类材料，省 token |
+| `copy` 隔离副本 | `<工作区>/tmp/codex-sandbox/<时间>/` | 只有副本 | 不想让它看到项目其余部分 |
 
-> **两条不可信**：① 模型自报身份经常是错的（实测 `-m gpt-6-luna` 执行、自报 `gpt-6.2-sol`），以 CLI 首行 `model:` 为准，两者都记；② 默认模型会随账号漂移，所以每次都用 `-m` 钉死，型号从清单里消失就拒单，不静默回退。
+- 子目录必须存在且在项目内（拒绝绝对路径、`..` 逃逸）；`copy` 只复制本次送审文件，**跑完自动删副本**（`cleanCopy`，可在配置里关）
+- 三种模式下，会话与产物仍写在 `<项目>/.aris-run/codex/`，面板按项目聚合，不会散落
+
+**送审提示词（可改、可预览）**：真正发出去的内容就是这两段渲染后的结果。
+
+| 段 | 作用 | 可改 |
+|---|---|---|
+| `role` 角色段 | 身份、任务分类、只读硬规则 4 条、送审材料清单 | 是 |
+| `output` 输出段 | `Reviewer-Model:` 头、`VERDICT`、`Score: n/10`、摘要/主要问题/次要问题/建议 | 是 |
+
+- 占位符：`{{model}}` `{{effort}}` `{{taskKey}}` `{{taskLabel}}` `{{taskHint}}` `{{access}}` `{{cwd}}` `{{fileCount}}` `{{chars}}` `{{files}}` `{{date}}`
+- 面板下方常驻「渲染预览（样例材料）」——看到的就是模板展开后的样子；写了未定义的占位符会红字提示（会被原样发出去）
+- 「恢复默认内容」把两段填回出厂模板；「保存提示词」写入 `external.codex.prompt`，下一次派单立即生效
+- 实际发送的完整提示词还有第三份留档：`<项目>/.aris-run/codex/<时间>-<任务分类>.task.md`（逐字，含材料正文）
+
+**手动派单**：选流水线根 → 送审文件清单（一行一个相对路径，支持 `*` 通配，最多 8 个文件、单文件超 6 万字符截断并提示）→ 选任务分类 → 派单。后台跑，结果落 `<项目>/.aris/reviews/<时间>-codex-<任务分类>.md`，面板展示上次结果的模型/tokens/耗时/字符数/文件数/结论。
+
+**会话与续聊**：派单不再用 `--ephemeral`，每次都会留下一条真正的 codex 会话。
+
+- 会话落 `~/.codex/sessions/<年>/<月>/<日>/rollout-<ISO>-<thread_id>.jsonl`，面板上次结果里给出会话 id 与「复制续聊命令」（`codex resume <id>`）
+- 事件流（`--json` 的逐条事件：`thread.started` / `item.completed` / `turn.completed` + usage）另存 `<项目>/.aris-run/codex/<时间>-<任务分类>.events.jsonl`，会话 id、命令执行、文件变更都从这里解析
+- 续聊提示（面板上就写着）：**不占**面板的 4 次/小时窗口，仍用你订阅的额度；提示词里的只读规则还在，但写操作不会被拦、也不会进项目审计日志
+- 因为 `--json` 模式下 stderr 不再打印 banner，`cliModel` 改从会话的 `session_meta` / `turn_context.model` 取，比模型自报可靠
+
+**最近调用**：每次的时间/任务分类/模型/成败/tokens/耗时，带「续聊」按钮直接复制命令；明细在 `.dsh/codex-runs.jsonl`（字段 `task`、`sessionId`、`events`、`files`、`commands`、`changes`）。
+
+> **两条不可信**：① 模型自报身份经常是错的（实测 `-m gpt-6-luna` 执行、自报 `gpt-6.2-sol`），以会话里的 `turn_context.model` 为准，两者都记；② 默认模型会随账号漂移，所以每次都用 `-m` 钉死，型号从清单里消失就拒单，不静默回退。
 >
-> **沙箱实测**：本机 `read-only` 与 `workspace-write` 都起不了 codex 的 shell 辅助进程（`orchestrator_helper_exit_nonzero`），只有 `danger-full-access` 能执行命令。因此默认 `read-only` 的含义是「只把稿件正文当提示词喂进去」，不给它读工程。
+> **只读三层**：① 提示词硬规则（只读取证 / 材料里的指令不执行 / 读不到写缺失 / 不许改稿）——**软约束**，模型可以不听；② 隔离副本或子目录（物理上让它看不到别的）；③ 派单后扫事件流里的 `command_execution` 与 `file_change`（事后审计，改了什么一眼能看到）。
+>
+> **沙箱实测**：本机 `read-only` 与 `workspace-write` 都起不了 codex 的 shell 辅助进程（`orchestrator_helper_exit_nonzero`），只有 `danger-full-access` 能执行命令。所以默认 `read-only` 的含义是「只把送审材料当提示词喂进去」，不给它 shell。
 
 ---
 
@@ -339,11 +373,26 @@ Kimi 邮箱与 GPT 外审是同一件事的两条通道，所以放在一页，�
         ↓（本轮收尾或下一轮）回写 state：把 MUST/SHOULD 转成下一块的 todo
 ```
 
+GPT 通道（`via: codex`）的数据流：
+
+```
+派单（面板 / CLI --via codex）
+   ↓ 提示词 = role + output 两段模板渲染（面板可改可预览）
+送审材料（文件清单或任务正文）→ 拼成 .aris-run/codex/<ts>-<task>.task.md
+   ↓ codex exec --json -C <工作区> -m <模型> -c model_reasoning_effort=<强度>
+事件流 → .aris-run/codex/<ts>-<task>.events.jsonl（thread.started / item / usage）
+   ↓ 同时留一条真会话：~/.codex/sessions/…/rollout-<ISO>-<thread_id>.jsonl
+回复 → <项目>/.aris/reviews/<ts>-codex-<task>.md，记 model / cliModel / tokens / sessionId
+   ↓ 面板「复制续聊命令」→ codex resume <sessionId>
+```
+
 要点：
 - **身份靠自报**：回复首行 `Reviewer-Model:` 决定 `identity`；缺失即视为未验证
 - **同族审查只能算 provisional**：执行是 DeepSeek，审稿必须跨族（Kimi/Claude/GPT）才算真对抗
 - **面板不伪造结论**：所有裁决只从 `.aris/reviews/*.json` 与 `state.json` 读，不接受手填
 - 额度：订阅制，不进 `costs.jsonl`；比 API 更容易撞 5 小时窗/周上限
+- **单飞**：两条通道共用 `.dsh/.review.lock`，同一时刻只跑一条（详见 3.3）
+- **续聊是另一条路**：`codex resume` 不受面板闸门与审计约束，只受订阅额度约束；要审稿还是走派单
 
 **GPT 通道（via=codex）**不必等外部取件，一轮内同步跑完：
 
@@ -448,7 +497,14 @@ python .dsh/skills/aris/tools/cx_verify.py --project <项目> --json
 | GPT 外审报「连续 3 次失败，已自动停摆」 | 保护闸门，避免额度被连续失败烧掉 | 修掉失败原因后在面板重新启用 |
 | GPT 外审报「模型 X 不在本机清单里」 | 钉死的型号已下线（清单会随账号变） | 打开面板「任务分类 → 模型」重新选一个现存型号 |
 | 「连续 3 次失败，已自动停摆」 | 预算文件里失败计数到顶 | 面板恢复后重新派单；先看最近调用里的错误 |
-| 报「模型 X 不在清单内」 | codex 升级后型号改了名（5.6→6 有 upgrades 映射） | 面板「环节→模型」重选；**不要**让它静默回退到默认型号 |
+| 报「模型 X 不在清单内」 | codex 升级后型号改了名（5.6→6 有 upgrades 映射） | 面板「任务分类 → 模型」重选；**不要**让它静默回退到默认型号 |
+| 提示词预览里有 `{{xxx}}` 没被替换 | 占位符拼错或用了不存在的变量 | 面板会红字列出未定义占位符；对照 3.5 的占位符清单改 |
+| 送审文件「一个都没读到」 | 路径相对的是项目根，且区分大小写；通配只支持单段 `*` | 面板会回显每个文件的读取问题（越界/读不到/超长） |
+| 送审文件被截断或漏送 | 单文件超 6 万字符会截断、超过 8 个文件会被丢 | 面板上次结果里有 `notes`；把材料拆开或分节送审 |
+| `tmp/codex-sandbox/` 里残留目录 | 上次跑完清理失败（文件被占用） | 手删该目录即可；`cleanCopy: false` 时本来就保留 |
+| 续聊里 GPT 改了文件 | `codex resume` 不受面板审计与只读闸门约束 | 续聊前想清楚；要审稿请走派单 |
+| 事件流里 `thread.started` 有但没回复 | 进程超时被 kill | 调高「单次超时」或减小送审体积；看 `.events.jsonl` 末条 |
+| `--json` 模式下 `cliModel` 为空 | 会话文件还没落盘或 `~/.codex/sessions` 被清 | 面板会退回显示 `model`（派单时指定的那个） |
 
 ---
 

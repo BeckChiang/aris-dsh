@@ -27,7 +27,7 @@ import {
 } from './aris-registry.mjs?v=46';
 import { costView, effectiveInterval, isRunning, kimiIntervalMinutes, nextKimiTick, nextRunAt, pendingReviews, pendingSubmittedAt, preflight, recoverStale, resetPrompt, runOnce, cancelStopIntent, stopPipeline, tick, todayStats } from './aris-runner.mjs?v=47';
 import { resolveDsh } from './aris-dsh.mjs?v=46';
-import { CODEX_TASKS, codexState, listModels, readCodexConfig, runCodexReview, saveCodexConfig } from './codex-review.mjs?v=3';
+import { CODEX_TASKS, codexState, listModels, normalizeWorkspace, previewPrompt, readCodexConfig, runCodexReview, saveCodexConfig } from './codex-review.mjs?v=4';
 import { readReviewRoute, routeBlocks, saveReviewRoute } from './review-route.mjs';
 import { collectReviewResults } from './review-results.mjs';
 
@@ -558,14 +558,75 @@ function codexSnapshot(workspace) {
     base = { error: String((e && e.message) || e) };
   }
   const taskDefs = CODEX_TASKS.map((t) => ({ key: t.key, label: t.label, hint: t.hint }));
+  let promptPreview = null;
+  try {
+    promptPreview = previewPrompt(readCodexConfig(workspace));
+  } catch {
+    promptPreview = null;
+  }
   return {
     ...base,
     route: readReviewRoute(workspace),
     taskDefs,
     stageDefs: taskDefs, // 旧名兼容
+    promptPreview,
     manual: codexManual,
     lastManual: readJsonSafe(path.join(workspace, '.dsh', 'codex-manual-last.json'), null),
   };
+}
+
+const SEND_FILE_MAX = 8; // 一次最多送几个文件
+const SEND_FILE_CHARS = 60000; // 单文件字符上限（约 15k tokens）
+
+function expandRel(root, rel) {
+  if (!rel.includes('*')) return [rel];
+  const dir = path.posix.dirname(rel);
+  const pattern = path.posix.basename(rel);
+  const re = new RegExp('^' + pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$');
+  let names = [];
+  try {
+    names = fs.readdirSync(path.join(root, dir));
+  } catch {
+    return [];
+  }
+  return names.filter((n) => re.test(n)).sort().map((n) => path.posix.join(dir, n));
+}
+
+/** 按「送审文件清单」把文件内容读出来：单文件截断、文件数封顶，问题记进 notes */
+function collectSendFiles(root, list) {
+  const notes = [];
+  const files = [];
+  const seen = new Set();
+  for (const item of list) {
+    for (const rel of expandRel(root, item)) {
+      if (seen.has(rel)) continue;
+      seen.add(rel);
+      if (files.length >= SEND_FILE_MAX) {
+        notes.push('文件数超过 ' + SEND_FILE_MAX + ' 个，已忽略 ' + rel);
+        continue;
+      }
+      const abs = path.resolve(root, rel);
+      if (path.relative(root, abs).startsWith('..')) {
+        notes.push('越界路径被忽略：' + rel);
+        continue;
+      }
+      let text = '';
+      try {
+        text = fs.readFileSync(abs, 'utf8');
+      } catch {
+        notes.push('读不到 ' + rel);
+        continue;
+      }
+      let truncated = false;
+      if (text.length > SEND_FILE_CHARS) {
+        text = text.slice(0, SEND_FILE_CHARS);
+        truncated = true;
+        notes.push(rel + ' 超过 ' + SEND_FILE_CHARS + ' 字符，已截断');
+      }
+      files.push({ rel, text, chars: text.length, truncated });
+    }
+  }
+  return { files, notes };
 }
 
 function startCodexRun(workspace, input) {
@@ -574,38 +635,95 @@ function startCodexRun(workspace, input) {
   if (routeBlocked) return { ok: false, blocked: true, error: routeBlocked };
   const taskKey = String(input.task || input.taskKey || input.gate || 'routine_review');
   const root = path.resolve(String(input.root || ''));
-  if (!existsDir(root)) return { ok: false, error: `项目目录不存在：${root}` };
-  const target = path.resolve(root, String(input.target || ''));
-  const rel = path.relative(root, target);
-  if (rel.startsWith('..')) return { ok: false, error: '目标文件必须在项目目录内' };
-  let text;
-  try {
-    text = fs.readFileSync(target, 'utf8');
-  } catch {
-    return { ok: false, error: `目标文件读不到：${rel}` };
+  if (!existsDir(root)) return { ok: false, error: '项目目录不存在：' + root };
+
+  // 送审文件清单：input.files 可以是数组，也可以是换行/逗号分隔的字符串；空则退回单文件 target
+  const rawList = (Array.isArray(input.files) ? input.files : String(input.files || '').split(/[\n,]/))
+    .map((x) => String(x || '').trim().replace(/\\/g, '/'))
+    .filter(Boolean);
+  const targetRel = String(input.target || '').replace(/\\/g, '/').trim();
+  if (!rawList.length && targetRel) rawList.push(targetRel);
+  if (!rawList.length) return { ok: false, error: '请选择送审文件（或填一个目标文件）' };
+  const picked = collectSendFiles(root, rawList);
+  if (!picked.files.length) {
+    return { ok: false, error: '送审文件一个都没读到：' + (picked.notes.join('；') || rawList.join('、')) };
   }
+
+  // 工作区：决定 -C，也决定 ChatGPT 续聊时能看到的范围
+  const cfg = readCodexConfig(workspace);
+  const sel = normalizeWorkspace(
+    input.workspace
+      ? { ...normalizeWorkspace(cfg.workspace), ...(typeof input.workspace === 'string' ? { mode: input.workspace } : input.workspace) }
+      : cfg.workspace,
+  );
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  let cwd = root;
+  let copyDir = '';
+  if (sel.mode === 'subdir') {
+    const sub = path.resolve(root, sel.path || '');
+    if (!sel.path || !existsDir(sub) || path.relative(root, sub).startsWith('..')) {
+      return { ok: false, error: '子目录不存在或越界：' + (sel.path || '(空)') };
+    }
+    cwd = sub;
+  } else if (sel.mode === 'copy') {
+    copyDir = path.join(workspace, 'tmp', 'codex-sandbox', stamp);
+    try {
+      fs.mkdirSync(copyDir, { recursive: true });
+      for (const f of picked.files) {
+        const dest = path.join(copyDir, f.rel);
+        fs.mkdirSync(path.dirname(dest), { recursive: true });
+        fs.writeFileSync(dest, f.text, 'utf8');
+      }
+    } catch (e) {
+      return { ok: false, error: '准备隔离副本失败：' + String((e && e.message) || e) };
+    }
+    cwd = copyDir;
+  }
+
+  const labels = picked.files.map((f) => f.rel);
   const task = [
-    `# 稿审派单 · ${rel}`,
+    '# 稿审派单 · ' + labels.join('、'),
     '',
-    '下面是待审原文。请按 ARIS 审稿契约给出结论：先给 `VERDICT: accept|revise|reject`，再给 `Score: x/10`，然后写「## 摘要」与「## 主要问题」。',
+    '请按 ARIS 审稿契约给出结论：先给 `VERDICT: accept|revise|reject`，再给 `Score: x/10`，然后写「## 摘要」与「## 主要问题」。',
     '主要问题必须可证伪、并指明证据在原文的哪一句；没有证据就只能写「材料不足」。不要重写稿件。',
-    '',
-    '---',
-    '',
-    text,
   ].join('\n');
-  codexManual = { running: true, at: new Date().toISOString(), root, task: taskKey, target: rel, result: null, remaining: null, file: '' };
-  runCodexReview({ workspace, root, taskKey, task, model: input.model, effort: input.effort })
+
+  codexManual = {
+    running: true,
+    at: new Date().toISOString(),
+    root,
+    task: taskKey,
+    target: labels.join('、'),
+    files: labels,
+    workspace: sel,
+    cwd,
+    result: null,
+    remaining: null,
+    file: '',
+  };
+
+  const cleanup = () => {
+    if (!copyDir || !cfg.cleanCopy) return;
+    try {
+      fs.rmSync(copyDir, { recursive: true, force: true });
+    } catch {
+      /* 清不掉就留着，面板上能看到路径 */
+    }
+  };
+
+  runCodexReview({ workspace, root, taskKey, task, files: picked.files, cwd, workspaceMode: sel.mode })
     .then((res) => {
       let file = '';
       if (res.ok) {
         try {
           const dir = path.join(root, '.aris', 'reviews');
           fs.mkdirSync(dir, { recursive: true });
-          const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-          file = path.join(dir, `${stamp}-codex-${taskKey}.md`);
+          const fstamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+          file = path.join(dir, fstamp + '-codex-' + taskKey + '.md');
           fs.writeFileSync(file, res.text, 'utf8');
-        } catch { /* 记录写失败不影响返回 */ }
+        } catch {
+          /* 记录写失败不影响返回 */
+        }
       }
       codexManual = {
         ...codexManual,
@@ -613,19 +731,43 @@ function startCodexRun(workspace, input) {
         file,
         remaining: res.remaining ?? null,
         result: res.ok
-          ? { ok: true, model: res.model, cliModel: res.cliModel, effort: res.effort, tokens: res.tokens, ms: res.ms, chars: text.length, verdict: (require_verdict(res.text)), reply: res.text.slice(0, 4000) }
-          : { ok: false, error: res.error },
+          ? {
+            ok: true,
+            model: res.model,
+            cliModel: res.cliModel,
+            effort: res.effort,
+            tokens: res.tokens,
+            ms: res.ms,
+            chars: (res.entry && res.entry.chars) || 0,
+            files: labels.length,
+            sessionId: res.sessionId || '',
+            events: (res.entry && res.entry.events) || '',
+            verdict: require_verdict(res.text),
+            notes: picked.notes,
+            reply: res.text.slice(0, 4000),
+          }
+          : { ok: false, error: res.error, notes: picked.notes },
       };
       try {
         writeJsonAtomic(path.join(workspace, '.dsh', 'codex-manual-last.json'), {
-          at: codexManual.at, task: taskKey, target: rel, file, ...codexManual.result,
+          at: codexManual.at,
+          task: taskKey,
+          target: codexManual.target,
+          files: labels,
+          workspace: sel,
+          file,
+          ...codexManual.result,
         });
-      } catch { /* 落盘失败不影响面板 */ }
+      } catch {
+        /* 落盘失败不影响面板 */
+      }
+      cleanup();
     })
     .catch((e) => {
       codexManual = { ...codexManual, running: false, result: { ok: false, error: String((e && e.message) || e) } };
+      cleanup();
     });
-  return { ok: true, started: true, task: taskKey, target: rel };
+  return { ok: true, started: true, task: taskKey, target: labels.join('、'), files: labels, workspace: sel, cwd };
 }
 
 function require_verdict(text) {

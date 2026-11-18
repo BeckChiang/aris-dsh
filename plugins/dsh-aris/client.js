@@ -674,8 +674,13 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
       const { codex, pipes, busy, act } = props;
       const [draft, setDraft] = React.useState(null);
       const [root, setRoot] = React.useState('');
-      const [target, setTarget] = React.useState('');
+      const [filesText, setFilesText] = React.useState('');
       const [taskKey, setTaskKey] = React.useState('routine_review');
+      const [draftRole, setDraftRole] = React.useState(null);
+      const [draftOutput, setDraftOutput] = React.useState(null);
+      const [wsMode, setWsMode] = React.useState(null);
+      const [wsPath, setWsPath] = React.useState(null);
+      const [copied, setCopied] = React.useState('');
       if (!codex) return h('div', { className: 'daris-empty' }, 'GPT 外审状态还没读到。');
       if (codex.error) return h('div', { className: 'daris-err' }, `GPT 外审状态读取失败：${codex.error}`);
       const c = draft || codex.config || {};
@@ -698,7 +703,25 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
       };
       const manual = codex.manual || {};
       const last = codex.lastManual || null;
-      const nums = h('div', { className: 'daris-row', style: { marginTop: 10 } },
+      const pp = codex.promptPreview || {};
+      const roleText = draftRole !== null ? draftRole : String(pp.role || '');
+      const outputText = draftOutput !== null ? draftOutput : String(pp.output || '');
+      const ws = codex.workspace || { mode: 'root', path: '' };
+      const modeDefs = codex.workspaceModes && codex.workspaceModes.length
+        ? codex.workspaceModes
+        : [{ mode: 'root', label: '项目根', hint: 'ChatGPT 续聊时能看到整个项目（推荐）' },
+          { mode: 'subdir', label: '指定子目录', hint: '视野收窄到一个目录，省 token；续聊也只能看到该目录' },
+          { mode: 'copy', label: '隔离副本', hint: '把送审文件复制到 tmp/codex-sandbox/<stamp>/ 再跑，跑完清理' }];
+      const mode = wsMode !== null ? wsMode : (ws.mode || 'root');
+      const subPath = wsPath !== null ? wsPath : (ws.path || '');
+      const copy = (text) => {
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text);
+        } catch (e) { /* 剪贴板不可用就退回手选 */ }
+        setCopied(text);
+      };
+      const nSessions = (codex.storage && codex.storage.codexSessions) || {};
+      const budgetFields = h('div', { className: 'daris-row', style: { marginTop: 10 } },
         h('div', null, h('div', { className: 'daris-k' }, '每小时上限'), h('input', { className: 'daris-input daris-num', type: 'number', min: 1, max: 60, value: c.hourlyLimit, onChange: (e) => setDraft({ ...c, hourlyLimit: e.target.value }) })),
         h('div', null, h('div', { className: 'daris-k' }, '每日上限（0=不限）'), h('input', { className: 'daris-input daris-num', type: 'number', min: 0, value: c.dailyLimit, onChange: (e) => setDraft({ ...c, dailyLimit: e.target.value }) })),
         h('div', null, h('div', { className: 'daris-k' }, '单次超时（分钟）'), h('input', { className: 'daris-input daris-num', type: 'number', min: 1, max: 30, value: c.timeoutMinutes, onChange: (e) => setDraft({ ...c, timeoutMinutes: e.target.value }) })),
@@ -706,89 +729,150 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
         h('div', null, h('div', { className: 'daris-k' }, '沙箱'), h('select', { className: 'daris-input', value: c.sandboxMode || 'read-only', onChange: (e) => setDraft({ ...c, sandboxMode: e.target.value }) },
           h('option', { value: 'read-only' }, 'read-only（只读正文）'),
           h('option', { value: 'danger-full-access' }, 'full-access（可翻仓库）'))));
-      return h('div', null,
-        h(Group, {
-          title: 'GPT 外审通道 · 开关与额度',
-          sub: '本机 ChatGPT 桌面端的 Codex CLI（订阅登录，不另付费）。额度共用订阅，所以闸门在派单前生效：超限直接拒，不静默降级。',
-          badge: c.enabled ? '已启用' : '未启用',
-        },
-          h('div', null,
-            h('div', { className: 'daris-row', style: { marginTop: 8 } },
-              h(Btn, { label: c.enabled ? '已启用 · 点击停用' : '未启用 · 点击启用', success: !c.enabled, danger: c.enabled, disabled: busy, onClick: () => save({ enabled: !c.enabled }) }),
-              h('span', { className: 'daris-tag' }, codex.exeOk ? 'codex.exe 已找到' : 'codex.exe 未找到'),
-              h('span', { className: 'daris-tag' }, `本小时 ${codex.usedThisHour}/${c.hourlyLimit}`),
-              h('span', { className: 'daris-tag' }, `今日 ${codex.todayCount}${Number(c.dailyLimit) > 0 ? '/' + c.dailyLimit : '（不限）'}`),
-              Number(codex.consecutiveFailures) > 0 ? h('span', { className: 'daris-tag' }, `连续失败 ${codex.consecutiveFailures}/3`) : null),
-            h('div', { className: 'daris-path', style: { marginTop: 6 } }, codex.exe || '（未解析到 codex.exe）'),
-            nums,
-            h('div', { className: 'daris-row', style: { marginTop: 10 } },
-              h(Btn, { label: '保存通道设置', primary: true, disabled: busy, onClick: () => save({ hourlyLimit: Number(c.hourlyLimit) || 4, dailyLimit: Number(c.dailyLimit) || 0, timeoutMinutes: Number(c.timeoutMinutes) || 8, proxy: String(c.proxy || ''), sandboxMode: c.sandboxMode || 'read-only' }) })),
-            h('div', { className: 'daris-tag', style: { marginTop: 8 } },
-              c.sandboxMode === 'danger-full-access'
-                ? 'full-access：GPT 可以自己执行命令翻仓库，也可能误改文件。'
-                : 'read-only：这台机上 codex 的只读 shell 辅助进程起不来（orchestrator_helper_exit_nonzero），所以 GPT 只读消息正文，不会去翻文件。'))),
-        h(Group, {
-          title: 'GPT 任务分类 · 每类用哪个模型',
-          sub: '按「这一单要审什么」配默认模型与思考强度，不绑流水线阶段（阶段会变，任务类型稳定）。',
-          badge: `${taskDefs.length} 类`,
-        },
-          h('div', null, taskDefs.map((def) => {
-            const st = (c.tasks || {})[def.key] || {};
-            const slug = st.model || '';
-            return h('div', { key: def.key, className: 'daris-row', style: { marginTop: 6 } },
-              h('span', { className: 'daris-tag', style: { minWidth: 150, display: 'inline-block' }, title: def.hint || '' }, def.label),
-              h('select', { className: 'daris-input', value: slug, onChange: (e) => saveTask(def.key, { model: e.target.value }) },
-                models.length
-                  ? models.map((m) => h('option', { key: m.slug, value: m.slug }, `${m.slug} · ${Math.round((m.contextWindow || 0) / 1000)}k`))
-                  : h('option', { value: slug }, slug || '（模型清单读不到）')),
-              h('select', { className: 'daris-input daris-num', value: st.effort || '', onChange: (e) => saveTask(def.key, { effort: e.target.value }) },
-                effortsOf(slug).map((x) => h('option', { key: x, value: x }, x))),
-              h(Btn, { label: st.enabled === false ? '关' : '开', disabled: busy, onClick: () => saveTask(def.key, { enabled: st.enabled === false }) }));
-          }))),
-        h(Group, {
-          title: '手动派单 · 选文件与任务分类',
-          sub: '挑一条流水线的根目录和一份目标文件，立刻让 GPT 外审跑一次（受小时额度、超时与审核锁约束，结果落到 <项目>/.aris/reviews/）。',
-          badge: manual.running ? '进行中' : '',
-        },
-          h('div', null,
-            h('div', { className: 'daris-row', style: { marginTop: 10 } },
-              h('select', { className: 'daris-input', value: root, onChange: (e) => setRoot(e.target.value) },
-                h('option', { value: '' }, '选择流水线…'),
-                (pipes || []).map((p) => h('option', { key: p.root, value: p.root }, p.name))),
-              h('input', { className: 'daris-input daris-grow', placeholder: '目标文件（相对项目根），例如 paper/main.md', value: target, onChange: (e) => setTarget(e.target.value) })),
-            h('div', { className: 'daris-row', style: { marginTop: 8 } },
-              h('select', { className: 'daris-input', value: taskKey, onChange: (e) => setTaskKey(e.target.value) },
-                taskDefs.map((d) => h('option', { key: d.key, value: d.key }, d.label))),
-              h(Btn, { label: manual.running ? '正在审…' : '派单', primary: true, disabled: busy || manual.running || !root || !target.trim(), onClick: () => act('codex.run', { root, target: target.trim(), task: taskKey }) })),
-            manual.running ? h('div', { className: 'daris-tag', style: { marginTop: 8 } }, `进行中：${manual.target} · ${manual.task || '-'} · 起于 ${ft(manual.at)}`) : null,
-            last
-              ? h('div', { style: { marginTop: 10 } },
-                h('div', { className: 'daris-k' }, `${last.ok ? '上次派单' : '上次失败'} · ${last.target} · ${last.task || '-'} · ${ft(last.at)}`),
-                last.ok
-                  ? h('div', null,
-                    h('div', { className: 'daris-tag', style: { marginTop: 6 } }, `模型 ${last.cliModel || last.model} / ${last.effort} · ${last.tokens} tokens · ${Math.round((last.ms || 0) / 1000)}s · verdict ${last.verdict || 'unknown'}`),
-                    last.file ? h('div', { className: 'daris-path' }, last.file) : null,
-                    h('pre', { className: 'daris-pre' }, String(last.reply || '').slice(0, 1500)))
-                  : h('div', { className: 'daris-err' }, String(last.error || '')))
-              : null)),
-        h(Group, {
-          title: '最近调用 · 每次谁审的',
-          sub: '明细在 .dsh/codex-runs.jsonl（耗时、tokens、CLI 实际模型、成败）。',
-          badge: `${(codex.recent || []).length} 条`,
-        },
-          h('div', null,
-            (codex.recent || []).length
-              ? (codex.recent || []).map((r, i) => h('div', { key: i, className: 'daris-row', style: { marginTop: 6 } },
-                h('span', { className: 'daris-tag' }, ft(r.at)),
-                h('span', { className: 'daris-tag' }, r.task || r.gate || '-'),
-                h('span', { className: 'daris-tag' }, `${r.cliModel || r.model}/${r.effort}`),
-                h('span', { className: 'daris-tag' }, r.ok ? 'ok' : 'fail'),
-                h('span', { className: 'daris-tag' }, `${r.tokens || 0} tok`),
-                h('span', { className: 'daris-tag' }, `${Math.round((r.ms || 0) / 1000)}s`),
-                r.ok ? null : h('span', { className: 'daris-err' }, String(r.error || '').slice(0, 120))))
-              : h('div', { className: 'daris-tag', style: { marginTop: 6 } }, '还没有调用记录。'))),
-        h(Group, { title: '说明 · 两条不可信与沙箱' },
-          h('div', { className: 'daris-sub' }, '模型清单读自本机 codex 的 models_cache.json，钉死的型号消失时会拒单而不是静默回退。模型自报身份不可信（实测 -m gpt-6-luna 却自报 gpt-6.2-sol），以 CLI 首行 model: 为准。')));
+
+      const statusRow = h('div', { className: 'daris-row', style: { marginTop: 8 } },
+        h('span', { className: c.enabled ? 'daris-tag ok' : 'daris-tag', style: { fontWeight: 600 } }, c.enabled ? '● 已启用' : '○ 已停用'),
+        h(Btn, { label: c.enabled ? '停用' : '启用', primary: !c.enabled, disabled: busy, onClick: () => save({ enabled: !c.enabled }) }),
+        h('span', { className: 'daris-tag' }, codex.exeOk ? 'codex.exe 已找到' : 'codex.exe 未找到'),
+        h('span', { className: 'daris-tag' }, `本小时 ${codex.usedThisHour}/${c.hourlyLimit}`),
+        h('span', { className: 'daris-tag' }, `今日 ${codex.todayCount}${Number(c.dailyLimit) > 0 ? '/' + c.dailyLimit : '（不限）'}`),
+        Number(codex.consecutiveFailures) > 0 ? h('span', { className: 'daris-tag' }, `连续失败 ${codex.consecutiveFailures}/3`) : null);
+
+      const saveChannel = h('div', { className: 'daris-row', style: { marginTop: 10 } },
+        h(Btn, { label: '保存通道设置', primary: true, disabled: busy, onClick: () => save({ hourlyLimit: Number(c.hourlyLimit) || 4, dailyLimit: Number(c.dailyLimit) || 0, timeoutMinutes: Number(c.timeoutMinutes) || 8, proxy: String(c.proxy || ''), sandboxMode: c.sandboxMode || 'read-only' }) }));
+
+      const g1 = h(Group, {
+        title: 'GPT 外审通道 · 状态与额度',
+        sub: '本机 ChatGPT 桌面端的 Codex CLI（订阅登录，不另付费）。额度共用订阅，所以闸门在派单前生效：超限直接拒，不静默降级。',
+        badge: c.enabled ? '已启用' : '已停用',
+      },
+        h('div', null,
+          statusRow,
+          h('div', { className: 'daris-path', style: { marginTop: 6 } }, codex.exe || '（未解析到 codex.exe）'),
+          h('div', { className: 'daris-tag', style: { marginTop: 6 } }, `会话库 ~/.codex/sessions 现占 ${((nSessions.bytes || 0) / 1048576).toFixed(2)} MB、${nSessions.files || 0} 个文件（默认只报体积，不自动删）`),
+          budgetFields,
+          saveChannel,
+          h('div', { className: 'daris-tag', style: { marginTop: 8 } },
+            c.sandboxMode === 'danger-full-access'
+              ? 'full-access：GPT 可以自己执行命令翻仓库，也可能误改文件；只读靠提示词里那四条硬规则约束。'
+              : 'read-only：这台机上 codex 的只读 shell 辅助进程起不来（orchestrator_helper_exit_nonzero），所以 GPT 只读送审材料，不会去翻文件。')));
+
+      const modeBtns = h('div', { className: 'daris-row', style: { marginTop: 8 } },
+        modeDefs.map((m) => { const k = m.key || m.mode; return h(Btn, { key: k, label: m.label, primary: mode === k, disabled: busy, onClick: () => setWsMode(k) }); }));
+
+      const g2 = h(Group, {
+        title: '派单工作区 · GPT 能看到哪',
+        sub: '这里决定 -C（GPT 眼里的工作区），也决定你在 ChatGPT 里续聊时它还能看到什么。',
+        badge: mode === 'subdir' && subPath ? `subdir · ${subPath}` : mode,
+      },
+        h('div', null,
+          modeBtns,
+          h('div', { className: 'daris-sub', style: { marginTop: 6 } }, (modeDefs.find((m) => (m.key || m.mode) === mode) || {}).hint || ''),
+          mode === 'subdir'
+            ? h('input', { className: 'daris-input', style: { marginTop: 6, width: '100%' }, placeholder: '子目录（相对项目根），例如 dataset_gen', value: subPath, onChange: (e) => setWsPath(e.target.value) })
+            : null,
+          h('div', { className: 'daris-tag', style: { marginTop: 8 } }, '联动：续聊视野跟着这里走——选了子目录，ChatGPT 续聊时只看得到那个子目录。'),
+          h('div', { className: 'daris-row', style: { marginTop: 8 } },
+            h(Btn, { label: '保存工作区', primary: true, disabled: busy, onClick: () => save({ workspace: { mode, path: mode === 'subdir' ? subPath.trim() : '' } }) }),
+            h('span', { className: 'daris-tag' }, `当前 ${ws.mode}${ws.path ? ' · ' + ws.path : ''}`),
+            h('span', { className: 'daris-tag' }, c.cleanCopy === false ? '隔离副本保留' : '隔离副本跑完自动清'))));
+
+      const promptBox = h('div', null,
+        h('div', { className: 'daris-k', style: { marginTop: 8 } }, '角色段（role）'),
+        h('textarea', { className: 'daris-input', style: { width: '100%', minHeight: 150, fontFamily: 'ui-monospace, monospace', fontSize: 12 }, value: roleText, onChange: (e) => setDraftRole(e.target.value) }),
+        h('div', { className: 'daris-k', style: { marginTop: 8 } }, '输出段（output）'),
+        h('textarea', { className: 'daris-input', style: { width: '100%', minHeight: 110, fontFamily: 'ui-monospace, monospace', fontSize: 12 }, value: outputText, onChange: (e) => setDraftOutput(e.target.value) }),
+        (pp.unknown && pp.unknown.length) ? h('div', { className: 'daris-err', style: { marginTop: 6 } }, `有未定义占位符：${pp.unknown.join('、')}（会被原样发出去）`) : null,
+        h('div', { className: 'daris-row', style: { marginTop: 8 } },
+          h(Btn, { label: '保存提示词', primary: true, disabled: busy, onClick: async () => { await save({ prompt: { role: roleText, output: outputText } }); setDraftRole(null); setDraftOutput(null); } }),
+          h(Btn, { label: '恢复默认内容', disabled: busy, onClick: () => { const d = pp.defaults || {}; setDraftRole(d.role || ''); setDraftOutput(d.output || ''); } }),
+          h('span', { className: 'daris-tag' }, '保存后下一次派单立即生效')),
+        h('div', { className: 'daris-k', style: { marginTop: 10 } }, '渲染预览（样例材料）'),
+        h('pre', { className: 'daris-pre', style: { maxHeight: 260 } }, String(pp.prompt || '')));
+
+      const g3 = h(Group, {
+        title: '送审提示词 · 可改可预览',
+        sub: '派单时真正发出去的就是这两段渲染后的结果。可用占位符：{{model}} {{effort}} {{taskLabel}} {{taskHint}} {{access}} {{cwd}} {{fileCount}} {{chars}} {{files}} {{date}}',
+        badge: pp.chars ? `预览 ${pp.chars} 字符` : '',
+      }, promptBox);
+
+      const taskRows = taskDefs.map((def) => {
+        const st = (c.tasks || {})[def.key] || {};
+        const slug = st.model || '';
+        return h('div', { key: def.key, className: 'daris-row', style: { marginTop: 6 } },
+          h('span', { className: 'daris-tag', style: { minWidth: 150, display: 'inline-block' }, title: def.hint || '' }, def.label),
+          h('select', { className: 'daris-input', value: slug, onChange: (e) => saveTask(def.key, { model: e.target.value }) },
+            models.length
+              ? models.map((m) => h('option', { key: m.slug, value: m.slug }, `${m.slug} · ${Math.round((m.contextWindow || 0) / 1000)}k`))
+              : h('option', { value: slug }, slug || '（模型清单读不到）')),
+          h('select', { className: 'daris-input daris-num', value: st.effort || '', onChange: (e) => saveTask(def.key, { effort: e.target.value }) },
+            effortsOf(slug).map((x) => h('option', { key: x, value: x }, x))),
+          h(Btn, { label: st.enabled === false ? '关' : '开', disabled: busy, onClick: () => saveTask(def.key, { enabled: st.enabled === false }) }));
+      });
+
+      const g4 = h(Group, {
+        title: 'GPT 任务分类 · 每类用哪个模型',
+        sub: '按「这一单要审什么」配默认模型与思考强度，不绑流水线阶段（阶段会变，任务类型稳定）。',
+        badge: `${taskDefs.length} 类`,
+      }, h('div', null, taskRows));
+
+      const lastBlock = last
+        ? h('div', { style: { marginTop: 10 } },
+          h('div', { className: 'daris-k' }, `${last.ok ? '上次派单' : '上次失败'} · ${last.target} · ${last.task || '-'} · ${ft(last.at)}`),
+          last.ok
+            ? h('div', null,
+              h('div', { className: 'daris-tag', style: { marginTop: 6 } }, `模型 ${last.cliModel || last.model} / ${last.effort} · ${last.tokens} tokens · ${Math.round((last.ms || 0) / 1000)}s · ${last.chars || 0} 字符 · ${(last.files && last.files.length) || 1} 个文件 · verdict ${last.verdict || 'unknown'}`),
+              (last.notes && last.notes.length) ? h('div', { className: 'daris-err', style: { marginTop: 6 } }, last.notes.join('；')) : null,
+              last.file ? h('div', { className: 'daris-path' }, last.file) : null,
+              last.sessionId ? h('div', { style: { marginTop: 8 } },
+                h('div', { className: 'daris-row' },
+                  h(Btn, { label: '复制续聊命令', onClick: () => copy(`codex resume ${last.sessionId}`) }),
+                  h(Btn, { label: '复制会话 id', onClick: () => copy(last.sessionId) }),
+                  h('span', { className: 'daris-tag' }, last.sessionId)),
+                copied ? h('pre', { className: 'daris-pre', style: { marginTop: 6 } }, copied) : null,
+                h('div', { className: 'daris-tag', style: { marginTop: 6 } }, '续聊提示：不占面板的 4 次/小时窗口，仍用你订阅的额度；提示词里的只读规则还在，但写操作不会被拦、也不会进项目审计日志。')) : null,
+              h('pre', { className: 'daris-pre', style: { marginTop: 6 } }, String(last.reply || '').slice(0, 1500)))
+            : h('div', { className: 'daris-err' }, String(last.error || '')))
+        : null;
+
+      const g5 = h(Group, {
+        title: '手动派单 · 送哪些文件',
+        sub: '一行一个相对路径，支持 * 通配（最多 8 个文件，单文件超 6 万字符会截断并提示）。结果落到 <项目>/.aris/reviews/。',
+        badge: manual.running ? '进行中' : '',
+      },
+        h('div', null,
+          h('div', { className: 'daris-row', style: { marginTop: 10 } },
+            h('select', { className: 'daris-input', value: root, onChange: (e) => setRoot(e.target.value) },
+              h('option', { value: '' }, '选择流水线…'),
+              (pipes || []).map((p) => h('option', { key: p.root, value: p.root }, p.name)))),
+          h('textarea', { className: 'daris-input', style: { marginTop: 8, width: '100%', minHeight: 64, fontFamily: 'ui-monospace, monospace', fontSize: 12 }, placeholder: '例如：\npaper/main.md\nrefs.bib\ndataset_gen/*.md', value: filesText, onChange: (e) => setFilesText(e.target.value) }),
+          h('div', { className: 'daris-row', style: { marginTop: 8 } },
+            h('select', { className: 'daris-input', value: taskKey, onChange: (e) => setTaskKey(e.target.value) },
+              taskDefs.map((d) => h('option', { key: d.key, value: d.key }, d.label))),
+            h(Btn, { label: manual.running ? '正在审…' : '派单', primary: true, success: !manual.running, disabled: busy || manual.running || !root || !filesText.trim(), onClick: () => act('codex.run', { root, files: filesText, task: taskKey }) })),
+          manual.running ? h('div', { className: 'daris-tag', style: { marginTop: 8 } }, `进行中：${manual.target} · ${manual.task || '-'} · 起于 ${ft(manual.at)}`) : null,
+          lastBlock));
+
+      const recentRows = (codex.recent || []).map((r, i) => h('div', { key: i, className: 'daris-row', style: { marginTop: 6 } },
+        h('span', { className: 'daris-tag' }, ft(r.at)),
+        h('span', { className: 'daris-tag' }, r.task || r.gate || '-'),
+        h('span', { className: 'daris-tag' }, `${r.cliModel || r.model}/${r.effort}`),
+        h('span', { className: 'daris-tag' }, r.ok ? 'ok' : 'fail'),
+        h('span', { className: 'daris-tag' }, `${r.tokens || 0} tok`),
+        h('span', { className: 'daris-tag' }, `${Math.round((r.ms || 0) / 1000)}s`),
+        r.sessionId ? h(Btn, { label: '续聊', onClick: () => copy(`codex resume ${r.sessionId}`) }) : null,
+        r.ok ? null : h('span', { className: 'daris-err' }, String(r.error || '').slice(0, 120))));
+
+      const g6 = h(Group, {
+        title: '最近调用 · 每次谁审的',
+        sub: '明细在 .dsh/codex-runs.jsonl（耗时、tokens、CLI 实际模型、会话 id、成败）；事件流在 <项目>/.aris-run/codex/*.events.jsonl。',
+        badge: `${(codex.recent || []).length} 条`,
+      }, h('div', null, recentRows.length ? recentRows : h('div', { className: 'daris-tag', style: { marginTop: 6 } }, '还没有调用记录。')));
+
+      const g7 = h(Group, { title: '说明 · 两条不可信与只读三层' },
+        h('div', { className: 'daris-sub' }, '模型清单读自本机 codex 的 models_cache.json，钉死的型号消失时会拒单而不是静默回退。模型自报身份不可信（实测 -m gpt-6-luna 却自报 gpt-6.2-sol），以 CLI 会话里的 turn_context.model 为准。只读靠三层：提示词硬规则（软约束）、送审文件隔离副本（物理隔离）、派单后扫命令与文件变更（事后审计）。'));
+
+      return h('div', null, g1, g2, g3, g4, g5, g6, g7);
     }
 
     function ArisPanel() {
