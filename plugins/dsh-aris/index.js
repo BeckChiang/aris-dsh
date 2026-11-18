@@ -63,6 +63,7 @@ const ACTIONS = new Set([
   'sessions.name', 'sessions.retitle', 'runtime.reset',
   'paper.build',
   'guard.test',
+  'codex.state', 'codex.save', 'codex.run', 'codex.models',
 ]);
 
 function json(res, status, value) {

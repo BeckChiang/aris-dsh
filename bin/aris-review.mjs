@@ -85,6 +85,8 @@ const USAGE = `用法: node bin/aris-review.mjs --project <dir> --target <file.m
                          （可重复；只列路径与大小，不嵌入正文）
   --purge-trash [天数]   清空 <mailbox>/trash/ 里超过 N 天（默认 30）的归档，缺省不动
                          入账成功的请求/回复会被自动移到 trash/<base>/，不再留在 in/out
+  --gate <name>          GPT 外审环节名（via=codex 时决定默认模型/强度），默认 S6_writing
+  --effort <level>       GPT 外审思考强度单次覆盖（low|medium|high|xhigh|max|ultra）
   --slots                只列出 reviewer.json 里配好的审查者（slot / via / 后端）后退出
   --reviewer <id>        按 reviewers[].id 指定审查者（默认按 --slot 匹配）
   -h, --help             显示本帮助
@@ -97,6 +99,9 @@ reviewer.json 支持两种写法（旧写法完全兼容）：
         {"slot":2,"backend":"openai","model":"…","base_url":"…","label":"同机异模型"}
       ]}
      via=kimi-mailbox → 直接走邮箱（等价 --enqueue），不调用任何本地/远端后端；
+     via=codex        → 直接调本机 Codex CLI（GPT 订阅登录）当审查者，模型/强度按环节取
+                        DSH 工作区 .dsh/aris-dashboard.json 的 external.codex.stages，
+                        可用 --model / --effort 单次覆盖；受每小时额度闸门约束。
      via 缺省为 direct（就是旧行为）。命令里显式给 --backend/--model/--base-url = 强制直连。
 
 退出码: 0 成功（含 verdict=reject）；2 配置/网络错误。`;
@@ -181,6 +186,8 @@ function resolveConfig(args) {
     slot: args.slot,
     round: args.round,
     requesterFamily: args['requester-family'],
+    gate: args.gate,
+    effort: args.effort,
   };
   for (const [k, v] of Object.entries(cliMap)) {
     if (v !== undefined && v !== null && v !== '') { cfg[k] = v; sources[k] = '命令行'; }
@@ -231,15 +238,22 @@ function resolveConfig(args) {
   cfg.maxChars = Math.max(0, Number(cfg.maxChars) || 0);
 
   // 命令行显式给了后端参数 = 强制直连，覆盖 reviewers[].via
+  // （codex 除外：--model 在那里是「单次覆盖环节模型」，不是切换后端）
   const explicitBackend = ['backend', 'baseUrl', 'model']
     .some((k) => sources[k] === '命令行');
   if (cfg.via === 'kimi-mailbox' && explicitBackend) cfg.via = 'direct';
 
-  if (!['direct', 'kimi-mailbox'].includes(cfg.via)) {
-    fail(`reviewers[].via 只能是 direct | kimi-mailbox，当前为 "${cfg.via}"。`);
+  if (!['direct', 'kimi-mailbox', 'codex'].includes(cfg.via)) {
+    fail(`reviewers[].via 只能是 direct | kimi-mailbox | codex，当前为 "${cfg.via}"。`);
   }
 
-  if (cfg.via === 'kimi-mailbox') {
+  if (cfg.via === 'codex') {
+    // GPT 外审：不碰 HTTP，模型/强度由 codex-review 按环节解析
+    cfg.backend = 'codex';
+    cfg.baseUrl = '-';
+    cfg.gate = String(cfg.gate || 'S6_writing');
+    if (sources.model !== '命令行') cfg.model = '（按环节默认）';
+  } else if (cfg.via === 'kimi-mailbox') {
     // 邮箱模式不碰网络，后端字段只作记录（谁真正生成结论由取件人决定，Model 由回复首行自报）
     cfg.backend = 'kimi-mailbox';
     cfg.baseUrl = '-';
@@ -1289,6 +1303,45 @@ function printSlots(cfg) {
   return 0;
 }
 
+/**
+ * GPT 外审（via=codex）：把 system+user 两段 prompt 合成一个任务文件交给本机 Codex CLI，
+ * 返回与 HTTP 后端同形的 outcome，让下游落盘/解析/登记逻辑完全复用。
+ * 额度、超时、模型漂移校验都在 bin/lib/codex-review.mjs 里，这里只做翻译。
+ */
+async function reviewViaCodex(cfg, prompts, round) {
+  const lib = await import('./lib/codex-review.mjs');
+  const workspace = path.resolve(HERE, '..'); // GPT 外审配置挂 DSH 工作区，不随审稿项目走
+  const task = [
+    prompts.system,
+    '',
+    '---',
+    '',
+    prompts.user,
+  ].join('\n');
+  const overrideModel = cfg.sources && cfg.sources.model === '命令行' ? cfg.model : undefined;
+  const overrideEffort = cfg.sources && cfg.sources.effort === '命令行' ? cfg.effort : undefined;
+  const res = await lib.runCodexReview({
+    workspace,
+    root: cfg.project,
+    gate: cfg.gate || 'S6_writing',
+    task,
+    model: overrideModel,
+    effort: overrideEffort,
+    stamp: `r${round}-slot${cfg.slot}-${localStamp(new Date())}`,
+  });
+  if (!res.ok) throw new ReviewError(res.error || 'GPT 外审失败');
+  cfg.codexMeta = { model: res.model, effort: res.effort, cliModel: res.cliModel, tokens: res.tokens, ms: res.ms, remaining: res.remaining };
+  return {
+    res: {
+      json: {
+        model: `codex/${res.model}/${res.effort}`,
+        choices: [{ message: { content: res.text } }],
+        usage: { total_tokens: res.tokens },
+      },
+    },
+  };
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) { console.log(USAGE); return 0; }
@@ -1335,7 +1388,9 @@ async function main() {
     round,
     backend: cfg.backend,
     model: cfg.model,
-    base_url: cfg.via === 'kimi-mailbox' ? '(邮箱模式，不走 HTTP)' : `${cfg.baseUrl}/chat/completions`,
+    base_url: cfg.via === 'kimi-mailbox'
+      ? '(邮箱模式，不走 HTTP)'
+      : (cfg.via === 'codex' ? '(本机 Codex CLI，不走 HTTP)' : `${cfg.baseUrl}/chat/completions`),
     api_key_env: cfg.apiKeyEnv,
     api_key_present: Boolean(cfg.apiKeyEnv && process.env[cfg.apiKeyEnv]),
     timeout_sec: cfg.timeoutSec,
@@ -1364,11 +1419,14 @@ async function main() {
 
   const t0 = Date.now();
   console.log(`→ 审查 ${relTo(cfg.project, target.abs)}（slot ${cfg.slot} / tier ${cfg.tier} / round ${round}）`);
-  console.log(`  backend=${cfg.backend} model=${cfg.model} → ${cfg.baseUrl}/chat/completions（超时 ${cfg.timeoutSec}s，失败重试 1 次）`);
+  console.log(`  backend=${cfg.backend} model=${cfg.model}`
+    + (cfg.via === 'codex'
+      ? ` → 本机 Codex CLI（环节 ${cfg.gate || 'S6_writing'}，单次上限见面板）`
+      : ` → ${cfg.baseUrl}/chat/completions（超时 ${cfg.timeoutSec}s，失败重试 1 次）`));
 
   let outcome;
   try {
-    outcome = await callReviewer(cfg, prompts);
+    outcome = cfg.via === 'codex' ? await reviewViaCodex(cfg, prompts, round) : await callReviewer(cfg, prompts);
   } catch (e) {
     const message = e instanceof ReviewError ? e.message : `未预期的错误：${e?.message || e}`;
     appendEvent(cfg, {
@@ -1407,7 +1465,7 @@ async function main() {
     `# ARIS 审查 · slot ${cfg.slot} · ${cfg.tier} · round ${round}`,
     '',
     `- target: ${target.abs}`,
-    `- reviewer: ${cfg.backend} / ${cfg.model}（reported: ${reportedModel}）`,
+    `- reviewer: ${cfg.codexMeta ? `codex / ${cfg.codexMeta.model} / ${cfg.codexMeta.effort}（CLI 实跑 ${cfg.codexMeta.cliModel || '?'}）` : `${cfg.backend} / ${cfg.model}`}（reported: ${reportedModel}）`,
     `- identity: ${parsed.identity}`,
     `- verdict: ${parsed.verdict}${parsed.score !== null ? ` · score ${parsed.score}/10` : ''}`,
     `- created_at: ${createdAt}`,
@@ -1437,6 +1495,7 @@ async function main() {
     created_at: createdAt,
     usage: outcome.res.json.usage || null,
     truncated: target.truncated,
+    ...(cfg.codexMeta ? { codex: cfg.codexMeta } : {}),
   };
 
   try {
@@ -1482,6 +1541,9 @@ async function main() {
   console.log(`  结构: ${jsonAbs}`);
   console.log(`  state.json: ${stateRes.updated ? `已登记（共 ${stateRes.count} 条 review）` : '未登记（见上方提示）'}`);
   console.log(`  耗时: ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+  if (cfg.codexMeta) {
+    console.log(`  GPT 外审: ${cfg.codexMeta.model} / ${cfg.codexMeta.effort} · ${cfg.codexMeta.tokens} tokens · 本小时剩余 ${cfg.codexMeta.remaining} 次`);
+  }
   if (parsed.verdict === 'unknown') console.log('  注意: 未从回复中解析出 accept/revise/reject，已记 unknown，请人工复核原文。');
   return 0;
 }

@@ -1,11 +1,11 @@
 {
   "repo": "BeckChiang/aris-dsh",
-  "generated_at": "2026-11-17T02:08:16.681Z",
+  "generated_at": "2026-11-18T06:36:00.970Z",
   "note": "由 scripts/sync.mjs 从本机 DSH 工作区单向生成；本文件为发布快照标识，请勿手改。",
   "rules_version": 1,
   "counts": {
-    "files": 675,
-    "bytes": 12882598
+    "files": 676,
+    "bytes": 12924074
   },
   "excluded": [
     "tests",
@@ -3214,8 +3214,8 @@
     },
     {
       "p": "bin/aris-review.mjs",
-      "sha256": "e8f24959f8947e4e",
-      "bytes": 65741
+      "sha256": "dcdbc43c3760b246",
+      "bytes": 68858
     },
     {
       "p": "bin/aris-run.mjs",
@@ -3244,8 +3244,8 @@
     },
     {
       "p": "bin/lib/aris-control.mjs",
-      "sha256": "9724e4e941a76be4",
-      "bytes": 40092
+      "sha256": "e01cc66927964db6",
+      "bytes": 44556
     },
     {
       "p": "bin/lib/aris-cost.mjs",
@@ -3283,6 +3283,11 @@
       "bytes": 17924
     },
     {
+      "p": "bin/lib/codex-review.mjs",
+      "sha256": "25043a6149d9794c",
+      "bytes": 18662
+    },
+    {
       "p": "bin/lit-bibmerge.mjs",
       "sha256": "eadc910be4c75ab9",
       "bytes": 7584
@@ -3309,8 +3314,8 @@
     },
     {
       "p": "docs/ARIS-流水线与面板手册.md",
-      "sha256": "82f2bc785e2e0bb9",
-      "bytes": 25131
+      "sha256": "4e217223ed9f6222",
+      "bytes": 30026
     },
     {
       "p": "LICENSE",
@@ -3319,8 +3324,8 @@
     },
     {
       "p": "plugins/dsh-aris/client.js",
-      "sha256": "a2445085c92d3d96",
-      "bytes": 78068
+      "sha256": "ba45231f355b8ea7",
+      "bytes": 88338
     },
     {
       "p": "plugins/dsh-aris/cordis.patch.yml",
@@ -3334,8 +3339,8 @@
     },
     {
       "p": "plugins/dsh-aris/index.js",
-      "sha256": "eab1937afb06df8f",
-      "bytes": 39212
+      "sha256": "96f1f8ff03bc8658",
+      "bytes": 39272
     },
     {
       "p": "plugins/dsh-aris/lib/actions.mjs",
@@ -3389,8 +3394,8 @@
     },
     {
       "p": "scripts/sync.mjs",
-      "sha256": "5d88d14784e3c9f7",
-      "bytes": 10888
+      "sha256": "5956b86b4f165202",
+      "bytes": 10896
     }
   ]
 }

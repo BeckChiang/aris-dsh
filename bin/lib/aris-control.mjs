@@ -3,7 +3,8 @@
 // an action name plus a few scalars.
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFile, execFileSync } from 'node:child_process';
+import { execFile, execFileSync, spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { appendEvent, readEvents } from './aris-events.mjs?v=46';
 import { enforceFloor, getBalance, readBalanceCache } from './aris-balance.mjs?v=46';
 import {
@@ -26,6 +27,9 @@ import {
 } from './aris-registry.mjs?v=46';
 import { costView, effectiveInterval, isRunning, kimiIntervalMinutes, nextKimiTick, nextRunAt, pendingReviews, pendingSubmittedAt, preflight, recoverStale, resetPrompt, runOnce, cancelStopIntent, stopPipeline, tick, todayStats } from './aris-runner.mjs?v=47';
 import { resolveDsh } from './aris-dsh.mjs?v=46';
+import { CODEX_STAGES, codexState, listModels, readCodexConfig, runCodexReview, saveCodexConfig } from './codex-review.mjs?v=1';
+
+const BIN_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const HANDOFF_FILE = path.join('.dsh', 'aris-handoff.json');
 
@@ -538,6 +542,90 @@ export function describePipeline(workspace, entry, settings) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// GPT 外审（via=codex）：面板状态 + 手动派单
+// ---------------------------------------------------------------------------
+
+let codexManual = { running: false, at: null, root: '', gate: '', target: '', result: null, remaining: null, file: '' };
+
+function codexSnapshot(workspace) {
+  let base;
+  try {
+    base = codexState(workspace);
+  } catch (e) {
+    base = { error: String((e && e.message) || e) };
+  }
+  return {
+    ...base,
+    stageDefs: CODEX_STAGES.map((s) => ({ key: s.key, label: s.label })),
+    manual: codexManual,
+    lastManual: readJsonSafe(path.join(workspace, '.dsh', 'codex-manual-last.json'), null),
+  };
+}
+
+function startCodexRun(workspace, input) {
+  if (codexManual.running) return { ok: false, error: '已有一次手动外审在跑，等它结束' };
+  const root = path.resolve(String(input.root || ''));
+  if (!existsDir(root)) return { ok: false, error: `项目目录不存在：${root}` };
+  const target = path.resolve(root, String(input.target || ''));
+  const rel = path.relative(root, target);
+  if (rel.startsWith('..')) return { ok: false, error: '目标文件必须在项目目录内' };
+  let text;
+  try {
+    text = fs.readFileSync(target, 'utf8');
+  } catch {
+    return { ok: false, error: `目标文件读不到：${rel}` };
+  }
+  const gate = String(input.gate || 'S6_writing');
+  const task = [
+    `# 稿审派单 · ${rel}`,
+    '',
+    '下面是待审原文。请按 ARIS 审稿契约给出结论：先给 `VERDICT: accept|revise|reject`，再给 `Score: x/10`，然后写「## 摘要」与「## 主要问题」。',
+    '主要问题必须可证伪、并指明证据在原文的哪一句；没有证据就只能写「材料不足」。不要重写稿件。',
+    '',
+    '---',
+    '',
+    text,
+  ].join('\n');
+  codexManual = { running: true, at: new Date().toISOString(), root, gate, target: rel, result: null, remaining: null, file: '' };
+  runCodexReview({ workspace, root, gate, task, model: input.model, effort: input.effort })
+    .then((res) => {
+      let file = '';
+      if (res.ok) {
+        try {
+          const dir = path.join(root, '.aris', 'reviews');
+          fs.mkdirSync(dir, { recursive: true });
+          const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+          file = path.join(dir, `${stamp}-codex-${gate}.md`);
+          fs.writeFileSync(file, res.text, 'utf8');
+        } catch { /* 记录写失败不影响返回 */ }
+      }
+      codexManual = {
+        ...codexManual,
+        running: false,
+        file,
+        remaining: res.remaining ?? null,
+        result: res.ok
+          ? { ok: true, model: res.model, cliModel: res.cliModel, effort: res.effort, tokens: res.tokens, ms: res.ms, chars: text.length, verdict: (require_verdict(res.text)), reply: res.text.slice(0, 4000) }
+          : { ok: false, error: res.error },
+      };
+      try {
+        writeJsonAtomic(path.join(workspace, '.dsh', 'codex-manual-last.json'), {
+          at: codexManual.at, gate, target: rel, file, ...codexManual.result,
+        });
+      } catch { /* 落盘失败不影响面板 */ }
+    })
+    .catch((e) => {
+      codexManual = { ...codexManual, running: false, result: { ok: false, error: String((e && e.message) || e) } };
+    });
+  return { ok: true, started: true, gate, target: rel };
+}
+
+function require_verdict(text) {
+  const m = /VERDICT\s*[:：=]\s*\**\s*(accept|revise|reject)/i.exec(String(text || ''));
+  return m ? m[1].toLowerCase() : 'unknown';
+}
+
 export function snapshot(workspace, config = {}) {
   const settings = readSettings(workspace, config);
   const registry = readRegistry(workspace);
@@ -569,6 +657,7 @@ export function snapshot(workspace, config = {}) {
       const d = resolveDsh(settings);
       return { kind: d.kind, file: d.file };
     })(),
+    codex: codexSnapshot(workspace),
     pipelines,
     running,
     mailbox: mailboxState(settings.mailbox),
@@ -799,6 +888,21 @@ export async function control(workspace, name, input = {}, config = {}) {
     case 'task.delete': {
       // 取件任务已退役：headless 每轮自己 collect，不再需要 Windows 计划任务。
       return { ok: true, deleted: null };
+    }
+    case 'codex.state': {
+      return { ok: true, codex: codexSnapshot(workspace) };
+    }
+    case 'codex.models': {
+      return { ok: true, models: listModels() };
+    }
+    case 'codex.save': {
+      // 写后立刻回读：面板显示的一定是落盘后的真值，不是乐观回显。
+      const patch = input.codex || input;
+      saveCodexConfig(workspace, patch && typeof patch === 'object' ? patch : {});
+      return { ok: true, codex: codexSnapshot(workspace), saved: readCodexConfig(workspace) };
+    }
+    case 'codex.run': {
+      return startCodexRun(workspace, input || {});
     }
     case 'handoff.set': {
       const mode = String(input.mode || '') === 'kimi' ? 'kimi' : 'dsh';
