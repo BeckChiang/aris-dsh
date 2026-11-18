@@ -713,6 +713,7 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
           h('div', { className: 'daris-row' },
             h('span', { className: 'daris-k' }, '会话回放'),
             h('span', { className: 'daris-tag' }, view.sessionId),
+            h(Btn, { label: '复制续聊指令', primary: true, onClick: () => copy(`codex resume ${view.sessionId}`) }),
             h(Btn, { label: '关闭', onClick: () => setView(null) })),
           view.loading ? h('div', { className: 'daris-tag', style: { marginTop: 6 } }, '正在读会话文件…') : null,
           view.err ? h('div', { className: 'daris-err', style: { marginTop: 6 } }, view.err) : null,
@@ -850,12 +851,11 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
               last.file ? h('div', { className: 'daris-path' }, last.file) : null,
               last.sessionId ? h('div', { style: { marginTop: 8 } },
                 h('div', { className: 'daris-row' },
-                  h(Btn, { label: '复制续聊命令', onClick: () => copy(`codex resume ${last.sessionId}`) }),
-                  h(Btn, { label: '复制会话 id', onClick: () => copy(last.sessionId) }),
+                  h(Btn, { label: '复制续聊指令', primary: true, onClick: () => copy(`codex resume ${last.sessionId}`) }),
                   h(Btn, { label: '查看会话', onClick: () => openSession(last.sessionId) }),
                   h('span', { className: 'daris-tag' }, last.sessionId)),
                 copied ? h('pre', { className: 'daris-pre', style: { marginTop: 6 } }, copied) : null,
-                h('div', { className: 'daris-tag', style: { marginTop: 6 } }, '续聊提示：不占面板的 4 次/小时窗口，仍用你订阅的额度；提示词里的只读规则还在，但写操作不会被拦、也不会进项目审计日志。')) : null,
+                h('div', { className: 'daris-tag', style: { marginTop: 6 } }, '续聊：复制上面的指令（`codex resume <会话 id>`）即可在 ChatGPT 里打开这条会话继续聊。续聊不占面板的 4 次/小时窗口，仍用你订阅的额度；提示词里的只读规则还在，但写操作不会被拦、也不会进项目审计日志。')) : null,
               h('pre', { className: 'daris-pre', style: { marginTop: 6 } }, String(last.reply || '').slice(0, 1500)))
             : h('div', { className: 'daris-err' }, String(last.error || '')))
         : null;
@@ -886,13 +886,13 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
         h('span', { className: 'daris-tag' }, r.ok ? 'ok' : 'fail'),
         h('span', { className: 'daris-tag' }, `${r.tokens || 0} tok`),
         h('span', { className: 'daris-tag' }, `${Math.round((r.ms || 0) / 1000)}s`),
-        r.sessionId ? h(Btn, { label: '续聊', onClick: () => copy(`codex resume ${r.sessionId}`) }) : null,
+        r.sessionId ? h(Btn, { label: '复制续聊指令', onClick: () => copy(`codex resume ${r.sessionId}`) }) : null,
         r.sessionId ? h(Btn, { label: '查看会话', onClick: () => openSession(r.sessionId) }) : null,
         r.ok ? null : h('span', { className: 'daris-err' }, String(r.error || '').slice(0, 120))));
 
       const g6 = h(Group, {
         title: '最近调用 · 每次谁审的',
-        sub: '明细在 .dsh/codex-runs.jsonl（耗时、tokens、CLI 实际模型、会话 id、成败）；事件流在 <项目>/.aris-run/codex/*.events.jsonl。',
+        sub: '每条都能「复制续聊指令」，粘到终端执行即在 ChatGPT 里打开该会话；明细在 .dsh/codex-runs.jsonl，事件流在 <项目>/.aris-run/codex/*.events.jsonl。',
         badge: `${(codex.recent || []).length} 条`,
       }, h('div', null, recentRows.length ? recentRows : h('div', { className: 'daris-tag', style: { marginTop: 6 } }, '还没有调用记录。')), sessionPanel);
 
