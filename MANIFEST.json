@@ -1,11 +1,11 @@
 {
   "repo": "BeckChiang/aris-dsh",
-  "generated_at": "2026-11-18T09:15:09.507Z",
+  "generated_at": "2026-11-18T09:21:59.193Z",
   "note": "由 scripts/sync.mjs 从本机 DSH 工作区单向生成；本文件为发布快照标识，请勿手改。",
   "rules_version": 1,
   "counts": {
     "files": 680,
-    "bytes": 12991728
+    "bytes": 12992601
   },
   "excluded": [
     "tests",
@@ -59,8 +59,8 @@
     },
     {
       "p": ".dsh/skills/aris/DSH_PORT.md",
-      "sha256": "99bdbe3f206bacc9",
-      "bytes": 30761
+      "sha256": "c3f814d9452b98a8",
+      "bytes": 31384
     },
     {
       "p": ".dsh/skills/aris/LICENSE",
@@ -3304,8 +3304,8 @@
     },
     {
       "p": "bin/lib/review-route.mjs",
-      "sha256": "40300d6b4e88f167",
-      "bytes": 2846
+      "sha256": "c444ca6bd9a231bb",
+      "bytes": 3096
     },
     {
       "p": "bin/lit-bibmerge.mjs",

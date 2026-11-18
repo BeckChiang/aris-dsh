@@ -64,5 +64,8 @@ export function routeBlocks(workspace, wanted /* 'kimi' | 'gpt' */) {
   if (channel === 'auto' || channel === wanted) return null;
   const other = channel === 'kimi' ? 'Kimi 邮箱' : 'GPT 外审';
   const self = wanted === 'kimi' ? 'Kimi 邮箱' : 'GPT 外审';
-  return `审核线路当前设为「${other}」，${self}这条路被关掉了；到面板「审核 → 审核线路」改一下再试`;
+  const hint = wanted === 'kimi'
+    ? '；审稿请直接用 `node bin/aris-review.mjs --project <项目> --slot 1 --target <稿>`（项目 .aris/reviewer.json 的 slot 1 已指向 GPT），不要再用 --enqueue'
+    : '；要用 GPT 请把面板「审核 → 审核线路」改成 auto 或 gpt';
+  return `审核线路当前设为「${other}」，${self}这条路被关掉了${hint}`;
 }

@@ -264,6 +264,12 @@ OPENAI_API_KEY=sk-... node bin/aris-review.mjs --project proj --target draft.md 
 
 ## 邮箱协议（外部审稿人 / Kimi Work 定时任务）
 
+> **2026-11-18 起，本机审稿默认走 GPT（Codex 桌面端），不要用 `--enqueue`。**
+> 项目 `.aris/reviewer.json` 的 slot 1 已改为 `via: codex`，直接：
+> `node bin/aris-review.mjs --project <项目> --slot 1 --target <稿>`
+> 加 `--task <分类>` 可选任务分类（`format_check`/`routine_review`/`deep_attack`/`claim_audit`/`citation_audit`/`layout_check`/`writing_review`，默认 `routine_review`）。
+> 面板「审核 → 审核线路」现为 `gpt`，`--enqueue` 会被拦并提示改用上面的命令。邮箱协议仍保留（Kimi 侧），需要时把线路改回 `auto` 或 `kimi`。
+
 用途：让本机能做的审查交给「另一个正在运行的桌面 agent」做——DSH 只读写文件，不碰网络、不起进程。
 实现：`bin/aris-review.mjs --enqueue` / `--collect`，目录默认 `<项目>/.aris/mailbox`。
 
