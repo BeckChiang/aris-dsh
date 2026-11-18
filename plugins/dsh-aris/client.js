@@ -670,6 +670,23 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
               onClick: () => { if (locked && o.value !== route.channel) return; act('review.route', { channel: o.value }); },
             }))),
           h('div', { className: 'daris-sub', style: { marginTop: 8 } }, cur.hint || ''),
+          (() => {
+            const projs = (route && route.projects) || [];
+            if (!projs.length) return null;
+            const mismatch = projs.filter((x) => x.exists && x.active && x.active !== route.channel && route.channel !== 'auto');
+            return h('div', { style: { marginTop: 8 } },
+              h('div', { className: 'daris-sub' }, '项目侧生效通道（reviewer.json 的 active）'),
+              h('div', { className: 'daris-row', style: { flexWrap: 'wrap', marginTop: 4 } },
+                projs.map((x) => h('span', {
+                  key: x.root,
+                  className: 'daris-tag ' + (x.active === route.channel || route.channel === 'auto' ? 'ok' : 'warn'),
+                  title: x.file || '',
+                }, `${x.name}：${x.active || '未配置'}`))),
+              mismatch.length
+                ? h('div', { className: 'daris-err', style: { marginTop: 6 } },
+                  `有 ${mismatch.length} 个项目的 reviewer.json 还是旧通道（${mismatch.map((m) => m.name).join('、')}）。点上面的线路按钮保存一次即可同步；不同步的话，流水线自己的送审仍按项目配置走。`)
+                : null);
+          })(),
           locked
             ? h('div', { className: 'daris-err', style: { marginTop: 6 } },
               `流水线「${runningPipes.join('、')}」正在运行，运行期间审核线路锁定，不能切换——跑到一半换通道会让同一轮出现两种审稿人。等这一轮结束再改。`)

@@ -28,7 +28,7 @@ import {
 import { costView, effectiveInterval, isRunning, kimiIntervalMinutes, nextKimiTick, nextRunAt, pendingReviews, pendingSubmittedAt, preflight, recoverStale, resetPrompt, runOnce, cancelStopIntent, stopPipeline, tick, todayStats } from './aris-runner.mjs?v=47';
 import { resolveDsh } from './aris-dsh.mjs?v=46';
 import { CODEX_TASKS, codexState, listModels, normalizeWorkspace, previewPrompt, readCodexConfig, runCodexReview, saveCodexConfig, quotaGate } from './codex-review.mjs?v=6';
-import { readReviewRoute, routeBlocks, saveReviewRoute } from './review-route.mjs';
+import { readProjectSlots, readReviewRoute, routeBlocks, saveReviewRoute } from './review-route.mjs?v=3';
 import { collectReviewResults } from './review-results.mjs';
 import { readSessionTranscript } from './codex-session.mjs';
 
@@ -601,9 +601,35 @@ function codexSnapshot(workspace) {
   } catch {
     promptPreview = null;
   }
+  // 项目侧实际生效的是 reviewer.json 的 active —— 面板要能看到它是同步的。
+  let projectRoutes = [];
+  try {
+    const reg = readRegistry(workspace);
+    projectRoutes = (Array.isArray(reg) ? reg : reg.projects || [])
+      .filter((e) => e && e.root)
+      .map((e) => {
+        let slots = { active: null, exists: false, file: '' };
+        let err = null;
+        try {
+          slots = readProjectSlots(e.root);
+        } catch (e2) {
+          err = String((e2 && e2.message) || e2);
+        }
+        return {
+          root: e.root,
+          name: e.name || path.basename(e.root),
+          active: slots.active,
+          exists: slots.exists,
+          file: slots.file,
+          ...(err ? { error: err } : {}),
+        };
+      });
+  } catch {
+    projectRoutes = [];
+  }
   return {
     ...base,
-    route: readReviewRoute(workspace),
+    route: { ...readReviewRoute(workspace), projects: projectRoutes },
     taskDefs,
     stageDefs: taskDefs, // 旧名兼容
     promptPreview,
@@ -1132,8 +1158,24 @@ export async function control(workspace, name, input = {}, config = {}) {
           };
         }
       }
-      const saved = saveReviewRoute(workspace, want);
-      return { ok: true, route: saved, dashboard: snapshot(workspace, config) };
+      // 面板是唯一入口：同时改 DSH 设置与每个项目的 reviewer.json（双槽保留）。
+      const projects = (() => {
+        try {
+          const reg = readRegistry(workspace);
+          return (Array.isArray(reg) ? reg : reg.projects || []).map((e) => ({ root: e && e.root, name: (e && (e.name || e.label)) || '' })).filter((x) => x.root);
+        } catch {
+          return [];
+        }
+      })();
+      const saved = saveReviewRoute(workspace, want, projects);
+      const bad = (saved.projects || []).filter((x) => x && x.ok === false);
+      return {
+        ok: bad.length === 0,
+        route: saved,
+        projects: saved.projects || [],
+        ...(bad.length ? { error: `设置已写入，但有 ${bad.length} 个项目同步失败：${bad.map((b) => b.root).join('、')}` } : {}),
+        dashboard: snapshot(workspace, config),
+      };
     }
     case 'codex.run': {
       return startCodexRun(workspace, input || {});

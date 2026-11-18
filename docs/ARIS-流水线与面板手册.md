@@ -165,11 +165,16 @@ Kimi 邮箱与 GPT 外审是同一件事的两条通道，所以放在一页，�
 4. **Kimi 邮箱通道** — 执行权、邮箱待办、取件节奏、取件提示词
 5. **GPT 外审：通道（状态+额度）/ 派单工作区 / 送审提示词 / 任务分类 / 手动派单 / 最近调用 / 说明**（详见 3.5）
 
-- **审核线路**：三选一，写在 `<工作区>/.dsh/aris-dashboard.json` 的 `external.review.channel`
-  - `auto`：两条都开放，谁先占锁谁跑（默认）
+- **审核线路**：三选一。面板是**唯一写入点**：保存时同时写两处并回读校验——
+  ① `<工作区>/.dsh/aris-dashboard.json` 的 `external.review.channel`（DSH 侧闸门读它）
+  ② 每个项目 `<root>/.aris/reviewer.json`（流水线自己的送审入口读它）
+  - `auto`：跟随项目 `reviewer.json` 的 `active`（切来切去之后的安全默认）
   - `kimi`：只走邮箱；面板「派单」与 CLI `--via codex` 会被直接拒，并提示去改线路
   - `gpt`：只走 GPT；邮箱投递（`aris-review --enqueue`）会被直接拒
   - 闸门是同步的：面板派单立刻回错误，不占小时额度、不拉起 codex
+- **双槽保留**：`reviewer.json` 里两套槽位都存着（`channels.kimi` / `channels.gpt`），`reviewers[]` 只放当前生效那套。切换线路是把当前槽归位、把目标槽铺出来，所以 **kimi ⇄ gpt 来回切不会丢配置**（`tier`、`timeoutSec`、任务分类都在）。
+- **项目侧是否同步**：线路卡下方列出每个项目的实际 `active`。出现琥珀色标签说明该项目 `reviewer.json` 还没跟上（保存失败或手工改过），点一次线路按钮即可同步；不同步时面板只影响 DSH 侧派单，流水线自己的送审仍按项目配置走。
+- **流水线送审入口按面板走**：`Frrs/second` 的 `pipeline/review/mailbox_bridge.py` 现在先读面板：`gpt` 时同步调 `node bin/aris-review.mjs --via codex --task <分类>` 并把评论落到流水线期待的结果文件；`kimi` 时保留邮箱桥（投递 + 刷 `queue.md`）；`auto` 跟随项目 `active`。**GPT 送审失败不降级到邮箱**，直接报错退出，避免"以为走了 GPT 其实又进了邮箱"。
 - **运行期锁定**：只要有流水线在跑（`pipelines[].running`），审核线路就被锁住，切到别的通道会直接被拒（同值保存仍放行）。面板上其余两个按钮置灰并给出原因，服务端也做同样的判断——跑到一半换通道会造成同一轮出现两种审稿人。等这一轮结束再改。
 - **单飞规则**：两条通道共用一把审核锁 `<工作区>/.dsh/.review.lock`，同一时刻只允许一次审核在跑。Kimi 投递时占锁、收件时解锁；GPT 派单时占锁、跑完解锁。锁被占时再投递/再派单会被直接拒绝，并告诉你锁在谁手里、多久前开始。
 - **审核通道卡**（页面顶部）：显示当前锁状态（空闲 / 运行中：通道 · 任务 · 目标）
@@ -411,6 +416,10 @@ GPT 通道（`via: codex`）的数据流：
 - 额度：订阅制，不进 `costs.jsonl`；比 API 更容易撞 5 小时窗/周上限
 - **单飞**：两条通道共用 `.dsh/.review.lock`，同一时刻只跑一条（详见 3.3）
 - **续聊是另一条路**：`codex resume` 不受面板闸门与审计约束，只受订阅额度约束；要审稿还是走派单
+- **面板改了线路、流水线却还送 Kimi**：先看线路卡下方项目的 `active` 是否跟上；没跟上就再点一次线路按钮保存（会同步 `reviewer.json`）。仍然不对，查 `pipeline/review/mailbox_bridge.py` 读到的 `external.review.channel` 与项目 `active` 是否一致
+- **GPT 送审失败后邮箱没有请求**：这是设计如此——GPT 通道失败直接退出、不降级，修好额度/线路后重跑同一命令即可
+- **改了 `bin/lib/*.mjs` 面板行为没变**：插件宿主按 URL 缓存模块，`lib` 之间互相 `import` 也要带版本号（如 `from './review-route.mjs?v=3'`），改完必须升版本再 `plugin_manager set_plugin include:aris` 关掉再开；只重启插件不升版本会继续跑旧代码（踩过：`readProjectSlots is not defined`）
+- **线路卡上的项目标签是琥珀色**：说明该项目 `reviewer.json` 的 `active` 还没跟上面板；点一次线路按钮即可同步（保存会逐个项目写入并回读）
 
 **GPT 通道（via=codex）**不必等外部取件，一轮内同步跑完：
 
