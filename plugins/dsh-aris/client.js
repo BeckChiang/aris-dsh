@@ -993,6 +993,65 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
       return h('div', null, g1, g2, g3, g4, g5, g6, g7);
     }
 
+    function LimitsBox(props) {
+      const p = props.p;
+      const [runs, setRuns] = React.useState(String((p.limits && p.limits.dailyRuns) || 0));
+      const [cny, setCny] = React.useState(String((p.limits && p.limits.dailyCny) || 0));
+      const unlimited = !Number(runs) && !Number(cny);
+      return h('div', null,
+        h('div', { className: 'daris-inline' },
+          h('span', { className: 'daris-k' }, '每天最多'),
+          h('input', { className: 'daris-input daris-num', value: runs, disabled: unlimited, onChange: (e) => setRuns(e.target.value), title: '每天最多执行几轮，0=不限' }),
+          h('span', { className: 'daris-tag' }, '轮 ·'),
+          h('input', { className: 'daris-input daris-num', value: cny, disabled: unlimited, onChange: (e) => setCny(e.target.value), title: '每天最多花多少钱，0=不限' }),
+          h('span', { className: 'daris-tag' }, '元'),
+          h('label', { className: 'daris-check', title: '勾选后不做任何每日限制' },
+            h('input', {
+              type: 'checkbox',
+              checked: unlimited,
+              onChange: (e) => { if (e.target.checked) { setRuns('0'); setCny('0'); } },
+            }), '不限'),
+          h(Btn, {
+            label: '保存',
+            disabled: props.busy,
+            onClick: () => props.act('limits.save', { root: p.root, dailyRuns: Number(runs) || 0, dailyCny: Number(cny) || 0 }),
+          })),
+        h('div', { className: 'daris-tag', style: { marginTop: 6 } }, `今日已跑 ${p.today ? p.today.runs : 0} 轮 · ${yu(p.today && p.today.cny)}`));
+    }
+    function HumanBox(props) {
+      const p = props.p;
+      // 输入内容放在面板层（humanNotes），本组件每轮渲染都会重建，
+      // 用局部 useState 会被 5 秒一次的轮询复位成空。
+      const text = String((props.notes && props.notes[p.root]) || '');
+      const setText = (v) => props.setNote(p.root, v);
+      const block = p.plan && p.plan.block ? p.plan.block : null;
+      const reason = block ? block.reason : p.blocked || '';
+      const hint = block ? block.hint : '';
+      const summary = `【${p.name}】${p.stage.stage}${block && block.id ? ` · ${block.id}` : ''}\n原因：${reason || '（未记录）'}${hint ? `\n建议：${hint}` : ''}`;
+      const copy = () => {
+        const nav = typeof navigator !== 'undefined' ? navigator : null;
+        const extra = p.activity && p.activity.text ? p.activity.text : '—';
+        if (nav && nav.clipboard) {
+          nav.clipboard.writeText(summary + `\n\n本轮上下文：${extra}`)
+            .then(() => props.toast('摘要已复制'), () => props.toast('复制失败，请手动选中'));
+        } else {
+          props.toast('当前环境不支持自动复制');
+        }
+      };
+      return h(Block, { title: '需要人工介入', className: 'human' },
+        h('div', { className: 'daris-human-reason' }, reason || '没有记录阻塞原因'),
+        hint ? h('div', { className: 'daris-human-hint' }, `建议：${hint}`) : null,
+        h('textarea', {
+          className: 'daris-input daris-human-input',
+          placeholder: '写一句你的裁决或补充信息；下一轮模型会读到它',
+          value: text,
+          onChange: (e) => setText(e.target.value),
+        }),
+        h('div', { className: 'daris-inline' },
+          h(Btn, { label: '提交并批准重启', primary: true, disabled: props.busy || !text.trim(), onClick: async () => { const r = await props.act('human.reply', { root: p.root, text, restart: true }); if (r && r.ok) setText(''); } }),
+          h(Btn, { label: '只留备注', disabled: props.busy || !text.trim(), onClick: async () => { const r = await props.act('human.reply', { root: p.root, text, restart: false }); if (r && r.ok) setText(''); } }),
+          h(Btn, { label: '复制摘要另开对话', onClick: copy })));
+    }
     function ArisPanel() {
       const [data, setData] = React.useState(null);
       const [err, setErr] = React.useState(null);
@@ -1197,66 +1256,7 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
         return `当前阶段 ${p.plan.current || '—'}`;
       };
 
-      function LimitsBox(props) {
-        const p = props.p;
-        const [runs, setRuns] = React.useState(String((p.limits && p.limits.dailyRuns) || 0));
-        const [cny, setCny] = React.useState(String((p.limits && p.limits.dailyCny) || 0));
-        const unlimited = !Number(runs) && !Number(cny);
-        return h('div', null,
-          h('div', { className: 'daris-inline' },
-            h('span', { className: 'daris-k' }, '每天最多'),
-            h('input', { className: 'daris-input daris-num', value: runs, disabled: unlimited, onChange: (e) => setRuns(e.target.value), title: '每天最多执行几轮，0=不限' }),
-            h('span', { className: 'daris-tag' }, '轮 ·'),
-            h('input', { className: 'daris-input daris-num', value: cny, disabled: unlimited, onChange: (e) => setCny(e.target.value), title: '每天最多花多少钱，0=不限' }),
-            h('span', { className: 'daris-tag' }, '元'),
-            h('label', { className: 'daris-check', title: '勾选后不做任何每日限制' },
-              h('input', {
-                type: 'checkbox',
-                checked: unlimited,
-                onChange: (e) => { if (e.target.checked) { setRuns('0'); setCny('0'); } },
-              }), '不限'),
-            h(Btn, {
-              label: '保存',
-              disabled: props.busy,
-              onClick: () => props.act('limits.save', { root: p.root, dailyRuns: Number(runs) || 0, dailyCny: Number(cny) || 0 }),
-            })),
-          h('div', { className: 'daris-tag', style: { marginTop: 6 } }, `今日已跑 ${p.today ? p.today.runs : 0} 轮 · ${yu(p.today && p.today.cny)}`));
-      }
 
-      function HumanBox(props) {
-        const p = props.p;
-        // 输入内容放在面板层（humanNotes），本组件每轮渲染都会重建，
-        // 用局部 useState 会被 5 秒一次的轮询复位成空。
-        const text = String((props.notes && props.notes[p.root]) || '');
-        const setText = (v) => props.setNote(p.root, v);
-        const block = p.plan && p.plan.block ? p.plan.block : null;
-        const reason = block ? block.reason : p.blocked || '';
-        const hint = block ? block.hint : '';
-        const summary = `【${p.name}】${p.stage.stage}${block && block.id ? ` · ${block.id}` : ''}\n原因：${reason || '（未记录）'}${hint ? `\n建议：${hint}` : ''}`;
-        const copy = () => {
-          const nav = typeof navigator !== 'undefined' ? navigator : null;
-          const extra = p.activity && p.activity.text ? p.activity.text : '—';
-          if (nav && nav.clipboard) {
-            nav.clipboard.writeText(summary + `\n\n本轮上下文：${extra}`)
-              .then(() => props.toast('摘要已复制'), () => props.toast('复制失败，请手动选中'));
-          } else {
-            props.toast('当前环境不支持自动复制');
-          }
-        };
-        return h(Block, { title: '需要人工介入', className: 'human' },
-          h('div', { className: 'daris-human-reason' }, reason || '没有记录阻塞原因'),
-          hint ? h('div', { className: 'daris-human-hint' }, `建议：${hint}`) : null,
-          h('textarea', {
-            className: 'daris-input daris-human-input',
-            placeholder: '写一句你的裁决或补充信息；下一轮模型会读到它',
-            value: text,
-            onChange: (e) => setText(e.target.value),
-          }),
-          h('div', { className: 'daris-inline' },
-            h(Btn, { label: '提交并批准重启', primary: true, disabled: props.busy || !text.trim(), onClick: async () => { const r = await props.act('human.reply', { root: p.root, text, restart: true }); if (r && r.ok) setText(''); } }),
-            h(Btn, { label: '只留备注', disabled: props.busy || !text.trim(), onClick: async () => { const r = await props.act('human.reply', { root: p.root, text, restart: false }); if (r && r.ok) setText(''); } }),
-            h(Btn, { label: '复制摘要另开对话', onClick: copy })));
-      }
 
       const stateOf = (p) => {
         if (p.status === 'error') return { key: 'error', label: '出错', cls: 'st-error' };
