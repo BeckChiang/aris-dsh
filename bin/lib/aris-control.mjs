@@ -25,7 +25,7 @@ import {
   upsertProject,
   writeJsonAtomic,
 } from './aris-registry.mjs?v=46';
-import { costView, effectiveInterval, isRunning, kimiIntervalMinutes, nextKimiTick, nextRunAt, pendingReviews, pendingSubmittedAt, preflight, recoverStale, resetPrompt, runOnce, cancelStopIntent, stopPipeline, tick, todayStats } from './aris-runner.mjs?v=47';
+import { costView, effectiveInterval, isRunning, kimiIntervalMinutes, nextKimiTick, nextRunAt, pendingReviews, pendingSubmittedAt, preflight, recoverStale, resetPrompt, runOnce, cancelStopIntent, stopPipeline, tick, todayStats, RUNNER_REV } from './aris-runner.mjs?v=48';
 import { resolveDsh } from './aris-dsh.mjs?v=46';
 import { CODEX_TASKS, codexState, listModels, normalizeWorkspace, previewPrompt, readCodexConfig, runCodexReview, saveCodexConfig, quotaGate } from './codex-review.mjs?v=7';
 import { readProjectSlots, readReviewRoute, routeBlocks, saveReviewRoute } from './review-route.mjs?v=3';
@@ -878,6 +878,7 @@ export function snapshot(workspace, config = {}) {
     ok: true,
     at: new Date().toISOString(),
     workspace,
+    runnerRev: RUNNER_REV,
     settings: {
       mailbox: settings.mailbox || '',
       model: settings.model,

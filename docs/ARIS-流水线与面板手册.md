@@ -517,6 +517,7 @@ python .dsh/skills/aris/tools/cx_verify.py --project <项目> --json
 | 微信/同步盘写入报 `EIO 1175` | 云占位文件被回写 | 用 Node 写盘并回读校验，重试一次即可 |
 | `Aris_Wiki` 说「需人工」但 `Aris_Dsh` 显示在跑 | 0.1.0 的旧口径（看 `.aris/reviews` mtime 判人工）；0.2.0 起与 dsh 同源 | 升级到 0.2.0；仍出现就看阻碍那条的类型 |
 | 阻碍里的按钮点了没反应 | 0.1.0 把动作渲染成纯文本 span | 0.2.0 起 `看日志 / 看门禁 / 看样子` 直接生效；`打开邮箱队列 / 看预算` 是**设计降级**：复制路径并提示去 `Aris_Dsh` |
+| 改了 `bin/lib/*.mjs` 但现象不变（如「未送审 N 轮」反复） | ESM 模块缓存按 **URL** 记，`plugin_manager` 重载只会用同一 URL 再 import 一次，拿到的还是内存里的旧模块 | 改 `aris-runner.mjs` 这类被 `aris-control.mjs` import 的模块，必须同步把 import 的 `?v=N` 升一号；快照里的 `runnerRev` 用来确认宿主实际加载的版本 |
 | 每轮弹「安装 sandbox」/ 要求提权 | 本机 `~/.codex/config.toml` 是 `[windows] sandbox = "elevated"`——elevated 后端要建机器级账户与网络规则，失效一次弹一次。审稿调用只喂正文、不执行命令，用不到 elevated | DSH 侧已固定带 `-c windows.sandbox=unelevated`（`.dsh/aris-dashboard.json` 的 `external.codex.windowsSandbox`）；桌面端自己也弹的话，把 `~/.codex/config.toml` 的 `[windows] sandbox` 改成 `unelevated` |
 | GPT 外审报「找不到 codex.exe」 | `Get-AppxPackage OpenAI.Codex` 查不到安装位，或应用被卸载/改名 | 面板会显示解析结果；确认 ChatGPT 桌面端还在，必要时把路径写进环境或重装应用 |
 | GPT 外审报 `SEC_E_NO_CREDENTIALS` / 连不上 | 沙箱内 HTTPS 拿不到凭据，或代理没开 | 确认 `127.0.0.1:7897` 在监听；codex 由插件宿主 spawn，不走 tool 沙箱 |
