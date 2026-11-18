@@ -890,6 +890,11 @@ export function reviewWatch(root, startedAt, report = '', settings = {}, exit = 
   const text = String(report || '');
   const pend = pendingReviews(settings, root);
   if (pend.length > 0) return { kind: 'submitted', note: '', bases: pend.map((p) => p.base) };
+  // 2026-11-18 修：面板把通道切到 GPT 后，送审根本不进 Kimi 邮箱，
+  // pendingReviews 永远是空，这一轮就会被当成「该送没送」——连续两轮直接停跑。
+  // 判「送没送」必须看所有通道的台账，而不是只看邮箱。
+  const recent = recentSubmissions(root, startedAt);
+  if (recent.length > 0) return { kind: 'submitted', note: '', bases: recent.slice(0, 5) };
   const skipped = /送审跳过[:：]\s*([^\n]{0,200})/.exec(text);
   if (skipped) return { kind: 'skipped', note: skipped[1].replace(/\s+/g, ' ').trim() };
   // 「已入队」只是模型单方面说法，没有台账就不认，但要能区分「没送」与「进程挂了」。
@@ -898,6 +903,43 @@ export function reviewWatch(root, startedAt, report = '', settings = {}, exit = 
   const fresh = freshReviewPackages(root, startedAt);
   if (fresh.length === 0) return { kind: 'none', note: '' };
   return { kind: 'silent', note: fresh.map((f) => path.basename(f)).join(', ') };
+}
+
+/**
+ * 本轮真正发生的送审证据（任意通道）：
+ * ① 项目事件账本 `.aris/meta/events.jsonl` 里的 review / review_enqueued / review_collected（字段名是 event，ts 为 ISO 字符串）
+ * ② `pipeline/review/mailbox_jobs/*.json`（python 桥落地的 job）
+ * ③ `.aris-run/codex/*.task.md`（GPT 通道的任务包）
+ * ④ `.aris/reviews/*.md`（两大通道最终都落成品审稿）
+ * 只认 startedAt 之后的（留 2 秒余量），旧账不算。
+ */
+export function recentSubmissions(root, startedAt = 0) {
+  const since = Number(startedAt) - 2000;
+  const hit = [];
+  try {
+    const text = fs.readFileSync(path.join(root, '.aris', 'meta', 'events.jsonl'), 'utf8');
+    for (const line of text.split(String.fromCharCode(10))) {
+      if (!line.trim()) continue;
+      let d;
+      try { d = JSON.parse(line); } catch { continue; }
+      const ev = String(d.event || '');
+      if (ev !== 'review' && ev !== 'review_enqueued' && ev !== 'review_collected') continue;
+      const at = Date.parse(d.ts || d.at || '') || 0;
+      if (at >= since) hit.push(`${ev}#${d.round != null ? d.round : ''}${d.backend ? '/' + d.backend : ''}`);
+    }
+  } catch { /* 没有事件账本就不是 frrs 布局 */ }
+  const scan = (dir, re) => {
+    let ents = [];
+    try { ents = fs.readdirSync(dir); } catch { return; }
+    for (const name of ents) {
+      if (!re.test(name)) continue;
+      try { if (fs.statSync(path.join(dir, name)).mtimeMs >= since) hit.push(name); } catch { /* 刚被移走 */ }
+    }
+  };
+  scan(path.join(root, 'pipeline', 'review', 'mailbox_jobs'), /^[^.]+\.json$/);
+  scan(path.join(root, '.aris-run', 'codex'), /\.task\.md$/);
+  scan(path.join(root, '.aris', 'reviews'), /\.md$/);
+  return hit;
 }
 
 /** 本轮（startedAt 之后）新写出的 review_package_*.md；只扫 dataset_gen 根层，避免扫到 out/ 的旧产物。 */
