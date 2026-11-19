@@ -1176,6 +1176,23 @@ export async function tick(workspace, { force = false, hooks = null } = {}) {
       // 解阻塞失败不拦调度
     }
 
+    // 小时额度用完：不启新一轮（避免空跑或到送审时被拒），排到恢复时刻；这不是人工阻塞。
+    if (!pending.length) {
+      try {
+        const q1 = await gptQuotaGate(workspace);
+        if (q1 && q1.blocked && q1.freeAt) {
+          const at = new Date(Math.max(Date.parse(q1.freeAt) || 0, Date.now())).toISOString();
+          if (runtime.nextAt !== at || runtime.nextAtBasis !== 'quota') {
+            saveRuntime(entry.root, { nextAt: at, nextAtBasis: 'quota', waiting: 0, gateReason: q1.reason || '等额度恢复' });
+          }
+          skipped.push({ root: entry.root, reason: '等额度恢复：' + (q1.reason || q1.freeAt) });
+          continue;
+        }
+      } catch {
+        // 查额度失败不拦调度
+      }
+    }
+
     // 间隔只由“有没有在途审稿”决定：有就等送审后的 Kimi 取件+审稿，没有就立刻。
     const finishedMs = runtime.lastRun?.finishedAt ? Date.parse(runtime.lastRun.finishedAt) : 0;
     const dueAt = pending.length
