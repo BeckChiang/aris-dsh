@@ -174,7 +174,10 @@ function humanActionsOf(workspace, groups) {
       out.push({ kind: 'reject', level: 'bad', name: latest.name, root: latest.root, title: `退回：${latest.scope || g.key}`, detail: latest.summary || '审稿人判 reject', at: latest.at, file: latest.rel });
     }
     const capped = out.some((a) => a.kind === 'cap' && a.name === latest.name);
-    if (latest.verdict === 'revise' && g.rounds >= 5 && !capped) {
+    // 人已经回过的，别每来一版就再提醒一次：答复之后又退回两版才重新提。
+    const note = latestHumanNoteAt(latest.root) || 0;
+    const sinceReply = 1 + (g.history || []).filter((h) => (h.atMs || 0) > note).length;
+    if (latest.verdict === 'revise' && g.rounds >= 5 && sinceReply >= 2 && !capped) {
       out.push({ kind: 'manyrounds', level: 'warn', name: latest.name, root: latest.root, title: `${latest.scope || g.key} 已改 ${g.rounds} 轮`, detail: '同一稿子反复退回，建议人看一眼是不是方向性问题', at: latest.at, file: latest.rel });
     }
   }

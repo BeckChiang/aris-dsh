@@ -294,7 +294,7 @@ table.daris2-tbl tbody tr.row.open td:first-child{background:var(--sel)}
 .daris2-gate-reason{font-size:12.5px;line-height:1.7;color:var(--tint-danger)}
 .daris2-gate-advice{margin-top:4px;font-size:12px;line-height:1.7;color:var(--tx2)}
 .daris2-gate-acts{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px}
-.daris2-ta{width:100%;margin-top:7px;padding:7px 9px;border:1px solid var(--ln2);border-radius:8px;background:rgba(127,127,127,.05);color:inherit;font:inherit;font-size:11.5px;line-height:1.6;min-height:58px;resize:vertical}
+.daris2-ta{box-sizing:border-box;width:100%;max-width:100%;display:block;margin-top:7px;padding:7px 9px;border:1px solid var(--ln2);border-radius:8px;background:rgba(127,127,127,.05);color:inherit;font:inherit;font-size:12.5px;line-height:1.65;min-height:64px;resize:vertical}
 .daris2-ta.mono{font-family:ui-monospace,SFMono-Regular,Consolas,Menlo,monospace;font-size:11px}
 .daris2-charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin-top:12px}
 .daris2-card{border:1px solid var(--ln);border-radius:10px;background:var(--dsw-alias-bg-base,#fff);overflow:hidden}
@@ -521,7 +521,7 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
 .daris-btn.danger:hover{background:#fdeceb;border-color:#e5a9a4;color:var(--dsw-alias-state-error-primary,#c6231b)}
 .daris-btn.success{color:var(--dsw-alias-state-success-primary,#18794e);border-color:color-mix(in srgb,var(--dsw-alias-state-success-primary,#18794e) 55%,transparent);background:color-mix(in srgb,var(--dsw-alias-state-success-primary,#18794e) 12%,transparent);font-weight:600}
 .daris-btn.success:hover{border-color:var(--dsw-alias-state-success-primary,#18794e);background:color-mix(in srgb,var(--dsw-alias-state-success-primary,#18794e) 18%,transparent)}
-.daris-input{height:28px;border:1px solid var(--dsw-alias-border-l2,#dcdfe5);border-radius:6px;padding:0 9px;font:inherit;font-size:12px;background:var(--dsw-alias-bg-base,#fff);color:var(--tx,#111318)}
+.daris-input{box-sizing:border-box;height:28px;border:1px solid var(--dsw-alias-border-l2,#dcdfe5);border-radius:6px;padding:0 9px;font:inherit;font-size:12px;background:var(--dsw-alias-bg-base,#fff);color:var(--tx,#111318)}
 .daris-input:focus{outline:none;border-color:rgba(127,127,127,.62)}
 .daris-grow{flex:1 1 420px;min-width:260px}
 .daris-num{width:64px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-align:right}
