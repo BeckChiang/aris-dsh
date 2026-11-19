@@ -99,6 +99,7 @@ body[data-ds-dark-theme] table.daris2-tbl th{color:var(--tx2)}
 .daris2-badge.idle,.daris2-badge.stop{color:var(--st-idle);background:var(--st-idle-bg)}
 .daris2-tag{display:inline-flex;align-items:center;height:18px;padding:0 5px;border-radius:5px;font-size:10.5px;background:rgba(127,127,127,.12);color:var(--tx2);font-variant-numeric:tabular-nums;white-space:nowrap}
 .daris2-tag.pri{background:var(--a-bg);color:var(--a)}
+.daris2-tag.must{background:var(--bg-sub,var(--dsw-alias-bg-layer-2,#f5f6f8));box-shadow:inset 0 0 0 1px var(--ln);font-weight:500;font-size:11px;height:19px}
 .daris2-tag.ok{color:var(--dsw-alias-state-success-primary,#18794e);background:color-mix(in srgb,var(--dsw-alias-state-success-primary,#18794e) 12%,transparent)}
 .daris2-tag.warn{color:var(--dsw-alias-state-warn-primary,#b45309);background:color-mix(in srgb,var(--dsw-alias-state-warn-primary,#b45309) 12%,transparent)}
 .daris2-tag.bad{color:var(--dsw-alias-state-error-primary,#b42318);background:color-mix(in srgb,var(--dsw-alias-state-error-primary,#b42318) 11%,transparent)}
@@ -1152,7 +1153,7 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
             h('span', { className: 's' }, `${rounds ? '第 ' + rounds + ' 轮' : '第 1 轮'}${g.historyCount > 1 ? ' · 历史 ' + (g.historyCount - 1) + ' 轮' : ''}`))),
           h('td', null, h('span', { className: 'daris2-badge ' + (v === 'accept' ? 'run' : v === 'reject' ? 'error' : v === 'revise' ? 'stopping' : 'idle') }, VERD_LABEL[v] || '未知'),
             l.acceptance ? h('div', { className: 'daris2-cell2' }, h('span', { className: 's' }, l.acceptance)) : null,
-            mustOf(g) ? h('div', { className: 'daris2-cell2' }, h('span', { className: 's' }, mustOf(g))) : null),
+            mustOf(g) ? h('div', { style: { marginTop: 4 } }, h('span', { className: 'daris2-tag must' }, mustOf(g))) : null),
           h('td', { className: 'num' }, l.score != null ? h('span', null, l.score, h('span', { className: 's', style: { fontSize: 11, color: 'var(--tx3)' } }, '/10')) : '—'),
           h('td', null, h('div', { className: 'daris2-cell2' },
             h('span', null, CH_LABEL[chan(g)] || chan(g)),
@@ -2273,7 +2274,7 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
               h('td', null, p.pending ? h('span', { className: 'daris2-badge review' }, `${p.pending} 轮未送审`) : h('span', { className: 'daris2-cell2 s' }, '无待送审'),
                 h('div', { className:'daris2-cell2 s' }, reviewCounts(p.name)),
                 h('div', { className: 'daris2-cell2 s' }, p.lastReview ? `${p.lastReview.verdict || ''}${p.lastReview.score != null ? ' ' + p.lastReview.score : ''}` : '未审'),
-                mustLine(p.name) ? h('div', { className: 'daris2-cell2 s' }, mustLine(p.name)) : null),
+                mustLine(p.name) ? h('div', { style: { marginTop: 3 } }, h('span', { className: 'daris2-tag must' }, mustLine(p.name))) : null),
               h('td', { className: 'num' }, h('div', null, '¥' + (((p.today && p.today.cny) || 0)).toFixed(2)),
                 h('div', { className: 'daris2-cell2 s' }, `${(p.totals && p.totals.runs) || 0} 轮 · ¥${((p.totals && p.totals.cny) || 0).toFixed(2)}`)),
               h('td', null, h('div', null, p.nextAt && !p.running ? ft(p.nextAt) : h('span', { className: 'daris2-cell2 s' }, p.running ? '本轮结束后' : (p.enabled ? '未排期' : '已停用'))),
