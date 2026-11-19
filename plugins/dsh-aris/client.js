@@ -647,6 +647,13 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
       const p = (n) => String(n).padStart(2, '0');
       return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
     };
+    const hhmm = (iso) => {
+      if (!iso) return '';
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return '';
+      const p = (n) => String(n).padStart(2, '0');
+      return `${p(d.getHours())}:${p(d.getMinutes())}`;
+    };
     // 缓存类读数（余额、GPT 额度）不是每秒探测的：给出「多久之前」，过期时明确写「可能过期」。
     const fresh = (o) => {
       if (!o) return '';
@@ -1931,6 +1938,7 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
         if (humanHot.has(p.name)) return { key: 'human', label: '需人工', cls: 'human' };
         if (p.stopping) return { key: 'stopping', label: '停止中', cls: 'stopping' };
         if (p.running) return { key: 'run', label: '正在运行', cls: 'run' };
+        if (p.nextAtBasis === 'quota') return { key: 'quota', label: '等额度', cls: 'warn' };
         if (!p.enabled) return { key: 'stop', label: '已停止', cls: 'stop' };
         if (Number(p.pending) > 0) return { key: 'review', label: '待审', cls: 'review' };
         return { key: 'idle', label: '空闲', cls: 'idle' };
@@ -2506,7 +2514,7 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
         body = h('div', null,
           quotaNote ? h('div', { className: 'daris2-band warn daris2-quota-band' },
             h('b', null, 'GPT 外审 · 本小时额度用完'),
-            h('span', { className: 'daris2-quota-note' }, `已用 ${quotaNote.used}/${quotaNote.limit}，${String(quotaNote.freeAt || '').slice(11, 16)} 之后自动恢复；期间不送审、不占用送审次数`)) : null,
+            h('span', { className: 'daris2-quota-note' }, `已用 ${quotaNote.used}/${quotaNote.limit}，${quotaNote.freeAtLocal || hhmm(quotaNote.freeAt)} 之后自动恢复；期间不送审、不占用送审次数`)) : null,
           h('section', { className:'daris2-card daris2-review-summary' },
             h('div',{className:'daris2-card-h'},'审核概览',h('small',null,'当前范围 · '+(scopeName||'全部流水线')),
               h(Btn,{label:'全局审核线路 · '+((cx.route && cx.route.channel)||'auto')+'　查看设置',onClick:()=>{setRouteFocus({v:true,n:Date.now()});setTab('settings')}})),

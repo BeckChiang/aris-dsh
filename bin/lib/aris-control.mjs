@@ -616,6 +616,17 @@ export function describePipeline(workspace, entry, settings) {
     // 下一轮：runtime 里没有就现算，避免「刚启用 / 刚改设置」时卡片显示空。
     ...(() => {
       if (config.enabled === false) return { nextAt: null, nextAtBasis: null };
+      // 等额度：runtime 里记的时间会随滚动窗口前移，这里按当前门禁重算，避免显示已过去的时间。
+      if (runtime.nextAtBasis === 'quota') {
+        let g1 = null;
+        try {
+          if (readReviewRoute(workspace).channel !== 'kimi') g1 = quotaGate(workspace, readCodexConfig(workspace));
+        } catch {
+          g1 = null;
+        }
+        if (g1 && g1.blocked && g1.freeAt) return { nextAt: g1.freeAt, nextAtBasis: 'quota', gateFreeAt: g1.freeAt };
+        return { nextAt: nextRunAt(settings, mode, Date.now(), {}), nextAtBasis: 'interval' };
+      }
       if (runtime.nextAt) return { nextAt: runtime.nextAt, nextAtBasis: runtime.nextAtBasis || 'interval' };
       if (pending.length) {
         return {
@@ -978,7 +989,9 @@ export function snapshot(workspace, config = {}) {
           extra.push({ kind: 'failures', level: 'bad', name: 'GPT 外审', title: '连续失败已停摆', detail: gate.reason, at: '', file: '' });
         } else if (gate && gate.blocked && gate.freeAt) {
           // 小时额度只是等待，不是人要做的事：单独给面板一条提示，不进 humanActions
-          rv.quotaNote = { kind: 'quota', level: 'warn', name: 'GPT 外审', title: '本小时额度用完', detail: `已用 ${gate.used}/${gate.limit}，${String(gate.freeAt).slice(11, 16)} 之后自动恢复；期间不送审、不占送审次数`, freeAt: gate.freeAt, used: gate.used, limit: gate.limit };
+          const ftMs = Date.parse(gate.freeAt) || 0;
+          const ftLocal = ftMs ? `${String(new Date(ftMs).getHours()).padStart(2, '0')}:${String(new Date(ftMs).getMinutes()).padStart(2, '0')}` : '额度恢复后';
+          rv.quotaNote = { kind: 'quota', level: 'warn', name: 'GPT 外审', title: '本小时额度用完', detail: `已用 ${gate.used}/${gate.limit}，${ftLocal} 之后自动恢复；期间不送审、不占送审次数`, freeAt: gate.freeAt, freeAtLocal: ftLocal, used: gate.used, limit: gate.limit };
         } else {
           rv.quotaNote = null;
         }
