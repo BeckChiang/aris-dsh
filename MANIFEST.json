@@ -1,11 +1,11 @@
 {
   "repo": "BeckChiang/aris-dsh",
-  "generated_at": "2026-11-19T12:08:23.287Z",
+  "generated_at": "2026-11-19T12:12:42.648Z",
   "note": "由 scripts/sync.mjs 从本机 DSH 工作区单向生成；本文件为发布快照标识，请勿手改。",
   "rules_version": 1,
   "counts": {
     "files": 681,
-    "bytes": 13158276
+    "bytes": 13158672
   },
   "excluded": [
     "tests",
@@ -3339,8 +3339,8 @@
     },
     {
       "p": "docs/ARIS-流水线与面板手册.md",
-      "sha256": "1980ef4ba27960b3",
-      "bytes": 69433
+      "sha256": "e6827c06a7eec3d7",
+      "bytes": 69829
     },
     {
       "p": "LICENSE",
