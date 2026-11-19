@@ -95,7 +95,7 @@ body[data-ds-dark-theme] table.daris2-tbl th{color:var(--tx2)}
 .daris2-badge.run{color:var(--st-run);background:var(--st-run-bg)}
 .daris2-badge.review{color:var(--st-run);background:var(--st-run-bg)}
 .daris2-badge.human,.daris2-badge.error{color:var(--st-err);background:var(--st-err-bg)}
-.daris2-badge.stopping{color:var(--st-warn);background:var(--st-warn-bg)}
+.daris2-badge.stopping,.daris2-badge.warn,.daris2-badge.quota{color:var(--st-warn);background:var(--st-warn-bg)}
 .daris2-badge.idle,.daris2-badge.stop{color:var(--st-idle);background:var(--st-idle-bg)}
 .daris2-tag{display:inline-flex;align-items:center;height:18px;padding:0 5px;border-radius:5px;font-size:10.5px;background:rgba(127,127,127,.12);color:var(--tx2);font-variant-numeric:tabular-nums;white-space:nowrap}
 .daris2-tag.pri{background:var(--a-bg);color:var(--a)}
@@ -1850,6 +1850,9 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
       };
 
       const stateOf = (p) => {
+        const blkText = String((p.plan && p.plan.block && p.plan.block.reason) || '');
+        const hourlyQuota = /额度|quota|429|限流/i.test(blkText) && !/物理送审|attempts\s*\d+\s*\/\s*\d+/i.test(blkText);
+        if (p.stage && p.stage.status === 'blocked_on_user' && hourlyQuota) return { key: 'quota', label: '等额度', cls: 'warn' };
         if (p.lastError) return { key: 'error', label: '出错', cls: 'error' };
         if (p.stage && p.stage.status === 'blocked_on_user') return { key: 'human', label: '等待人工', cls: 'human' };
         if (humanHot.has(p.name)) return { key: 'human', label: '需人工', cls: 'human' };
@@ -1860,8 +1863,8 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
         return { key: 'idle', label: '空闲', cls: 'idle' };
       };
       const kindOf = (p) => stateOf(p).key;
-      const LABEL = { error: '出错', human: '需人工', stopping: '停止中', run: '正在运行', review: '待审', stop: '已停止', idle: '空闲' };
-      const ORDER = { error: 0, human: 1, run: 2, review: 3, stopping: 4, idle: 5, stop: 6 };
+      const LABEL = { error: '出错', human: '需人工', quota: '等额度', stopping: '停止中', run: '正在运行', review: '待审', stop: '已停止', idle: '空闲' };
+      const ORDER = { error: 0, human: 1, quota: 2, run: 3, review: 4, stopping: 5, idle: 6, stop: 7 };
 
       if (!data) {
         return h('div', { className: 'daris daris2' },

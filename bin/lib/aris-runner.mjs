@@ -876,6 +876,45 @@ async function gptQuotaGate(workspace) {
   }
 }
 
+/**
+ * 额度类阻塞：流水线自己把 state.json 置成 blocked_on_user，原因是「GPT/Codex 本小时额度用尽」。
+ * 这不是要人裁决的事——等到额度窗口滑出就该自己接着跑，所以调度与面板都按「等额度」处理。
+ * 封顶转人工（review_physical_cap / cap-*）是另一回事，必须继续算人工。
+ */
+const QUOTA_BLOCK_RE = /额度|配额|quota|429|限流|rate.?limit/i;
+export function isQuotaBlock(block) {
+  if (!block || typeof block !== 'object') return false;
+  const reason = String(block.reason || '');
+  if (/review_physical_cap/i.test(reason) || /^cap-/.test(reason)) return false;
+  const text = [reason, block.summary, block.title, block.id].filter(Boolean).join(' ');
+  // 物理送审次数（attempts 15/15）是硬封顶，等一小时也不会恢复，仍算人工。
+  if (/物理送审|attempts\s*\d+\s*\/\s*\d+/i.test(text)) return false;
+  return QUOTA_BLOCK_RE.test(text);
+}
+
+/** 把「额度类 blocked_on_user」解回 running；解掉了返回 true。 */
+export function resumeQuotaBlock(root) {
+  const stateFile = path.join(root, 'pipeline', 'state.json');
+  let st;
+  try {
+    st = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+  } catch {
+    return false;
+  }
+  if (String(st.status || '') !== 'blocked_on_user') return false;
+  if (!isQuotaBlock(st.block)) return false;
+  const prev = st.block;
+  st.status = 'running';
+  st.block = null;
+  st.quota_block_resolved = { at: new Date().toISOString(), by: 'dsh-runner', previous: prev };
+  try {
+    fs.writeFileSync(stateFile, JSON.stringify(st, null, 2));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** 用户主动停用的标记：本轮退出时据此把状态写成 stopped 而不是 error。 */
 function stopRequestFile(root) {
   return path.join(root, '.aris-run', 'stop-request.json');
@@ -1109,6 +1148,29 @@ export async function tick(workspace, { force = false, hooks = null } = {}) {
     }
     if (!config.enabled && !force) continue;
     if (runtime.status === 'running') continue;
+
+    // 额度类 blocked_on_user：不是人工阻塞。额度恢复就解掉继续跑，没恢复就排到恢复时刻。
+    try {
+      const stFile = path.join(entry.root, 'pipeline', 'state.json');
+      let stNow = null;
+      try { stNow = JSON.parse(fs.readFileSync(stFile, 'utf8')); } catch {}
+      if (stNow && String(stNow.status || '') === 'blocked_on_user' && isQuotaBlock(stNow.block)) {
+        const q0 = await gptQuotaGate(workspace);
+        if (q0 && q0.blocked) {
+          const at = q0.freeAt ? new Date(Math.max(Date.parse(q0.freeAt) || 0, Date.now())).toISOString() : new Date(Date.now() + 10 * 60_000).toISOString();
+          if (runtime.nextAt !== at || runtime.nextAtBasis !== 'quota') {
+            saveRuntime(entry.root, { nextAt: at, nextAtBasis: 'quota', waiting: pending.length, gateReason: q0.reason || '等额度恢复' });
+          }
+          skipped.push({ root: entry.root, reason: q0.reason || '等额度恢复' });
+          continue;
+        }
+        if (resumeQuotaBlock(entry.root)) {
+          appendEvent(workspace, { name: entry.name || path.basename(entry.root), text: `${entry.name || path.basename(entry.root)}：额度恢复，解除额度类阻塞并继续` });
+        }
+      }
+    } catch {
+      // 解阻塞失败不拦调度
+    }
 
     // 间隔只由“有没有在途审稿”决定：有就等送审后的 Kimi 取件+审稿，没有就立刻。
     const finishedMs = runtime.lastRun?.finishedAt ? Date.parse(runtime.lastRun.finishedAt) : 0;

@@ -103,6 +103,18 @@ function latestHumanNoteAt(root) {
   }
 }
 
+// 额度类阻塞（纯小时额度）不算人工：等到额度窗口滑出就自己接着跑。
+const HOURLY_QUOTA_RE = /额度|quota|429|限流|rate.?limit/i;
+const PHYSICAL_CAP_RE = /物理送审|attempts\s*\d+\s*\/\s*\d+|review_physical_cap/i;
+function isHourlyQuotaBlock(block) {
+  if (!block || typeof block !== 'object') return false;
+  const reason = String(block.reason || '');
+  if (/^cap-/.test(reason)) return false;
+  const text = [reason, block.summary, block.title, block.id].filter(Boolean).join(' ');
+  if (PHYSICAL_CAP_RE.test(text)) return false;
+  return HOURLY_QUOTA_RE.test(text);
+}
+
 // 需要人处理的事：封顶转人工、状态机 blocked_on_user、连败停摆、退回
 function humanActionsOf(workspace, groups) {
   const out = [];
@@ -136,6 +148,7 @@ function humanActionsOf(workspace, groups) {
       st = JSON.parse(fs.readFileSync(path.join(root, 'pipeline', 'state.json'), 'utf8'));
     } catch {}
     if (st && st.block) {
+      if (isHourlyQuotaBlock(st.block)) return; // 等额度恢复，不报人工
       const checklist = String(st.block.manual_checklist || st.block.checklist || '');
       out.push({
         kind: 'cap',
