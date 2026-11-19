@@ -1,11 +1,11 @@
 {
   "repo": "BeckChiang/aris-dsh",
-  "generated_at": "2026-11-19T11:40:29.914Z",
+  "generated_at": "2026-11-19T11:41:41.123Z",
   "note": "由 scripts/sync.mjs 从本机 DSH 工作区单向生成；本文件为发布快照标识，请勿手改。",
   "rules_version": 1,
   "counts": {
     "files": 681,
-    "bytes": 13154415
+    "bytes": 13154790
   },
   "excluded": [
     "tests",
@@ -3349,8 +3349,8 @@
     },
     {
       "p": "plugins/dsh-aris/client.js",
-      "sha256": "9710210291395a79",
-      "bytes": 203062
+      "sha256": "01c4824fa54d28c4",
+      "bytes": 203437
     },
     {
       "p": "plugins/dsh-aris/cordis.patch.yml",

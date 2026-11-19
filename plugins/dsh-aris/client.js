@@ -31,7 +31,8 @@ body[data-ds-dark-theme] table.daris2-tbl th{color:var(--tx2)}
 .daris2-head{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;padding:14px 20px 12px;flex:none;border-bottom:1px solid var(--ln)}
 .daris2-head-main{flex:1 1 220px;min-width:0}
 .daris2-title{margin:0;font-size:15px;font-weight:600;letter-spacing:.01em}
-.daris2-fresh{color:var(--tx3);font-size:11.5px;font-variant-numeric:tabular-nums}
+.dari2-linkish{border:0;background:none;padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+  .daris2-fresh{color:var(--tx3);font-size:11.5px;font-variant-numeric:tabular-nums}
 .daris2-subtitle{display:flex;align-items:center;gap:4px 8px;flex-wrap:wrap;margin-top:3px;font-size:11.5px;color:var(--tx3)}
 .daris2-subtitle .sep{opacity:.4}
 .daris2-subtitle .bal{font-variant-numeric:tabular-nums}
@@ -2561,6 +2562,7 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
         h('span', { key: 'bal', className: 'bal' + balCls, title: bal.error || '' },
           `余额 ${bal.total == null ? '未知' : '¥' + Number(bal.total).toFixed(2)}`),
         fresh(bal) ? h('span', { key: 'balage', className: 'daris2-fresh' }, fresh(bal).replace(/^ · /, '')) : null,
+        h('button', { key: 'balupd', className: 'daris2-fresh dari2-linkish', title: '立即重新查询余额（会访问计费接口）', disabled: busy, onClick: () => act('balance.check', { force: true }) }, busy ? '查询中…' : '立即更新'),
       ];
 
       const head = h('div', { className: 'daris2-head' },
