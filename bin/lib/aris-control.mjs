@@ -636,6 +636,21 @@ export function describePipeline(workspace, entry, settings) {
     consecutiveErrors: runtime.consecutiveErrors || 0,
     lastError: runtime.lastError || null,
     costFile: costsFile(root),
+    gates: (() => { const list = Array.isArray(plan && plan.gates) ? plan.gates : []; return { done: list.filter((g) => g && g.status === 'done').length, total: list.length, list }; })(),
+    blockers: (() => {
+      const out = [];
+      const blk = plan && plan.block;
+      if (blk && (blk.reason || blk.id)) out.push({ severity: 'error', kind: 'state-block', text: String(blk.reason || blk.id), evidence: 'pipeline/state.json 的 block', human: true, action: { kind: 'open-log', label: '看日志' } });
+      if (String(stage && stage.status) === 'blocked_on_user') out.push({ severity: 'warn', kind: 'blocked-on-user', text: '等待人工裁决', evidence: 'state.json 标记 blocked_on_user', human: true, action: { kind: 'open-log', label: '看日志' } });
+      if (blocked) out.push({ severity: 'warn', kind: 'preflight', text: blocked, evidence: '运行前预检未通过', human: false });
+      if (running && Boolean(runtime.stopping)) out.push({ severity: 'info', kind: 'stopping', text: '已登记停止，本轮结束后停下', evidence: 'runtime.stopRequestedAt', human: false });
+      if (pending.length) out.push({ severity: 'info', kind: 'review-pending', text: pending.length + ' 轮还没送审', evidence: pending.map((x) => x.base).slice(0, 3).join('、'), human: false });
+      if (runtime.lastError) out.push({ severity: 'warn', kind: 'error', text: String(runtime.lastError).slice(0, 160), evidence: 'runtime.lastError', human: false });
+      return out;
+    })(),
+    history: (() => { const rows = Array.isArray(costs.runs) ? costs.runs : []; return rows.slice(0, 30).map((r) => ({ runId: r.runId || '', at: r.finishedAt || r.startedAt || '', steps: Number(r.steps) || 0, ms: Number(r.ms) || 0, cny: Number((r.cny && r.cny.total) || 0), tokens: Number((r.usage && r.usage.total) || 0), verdict: r.verdict || '', exit: r.exit == null ? null : r.exit })); })(),
+    budget: (() => { const u = (lastRun && lastRun.usage) || null; return { tokens: Number((u && u.total) || 0), ctxPct: Number(runtime.ctxPct ?? (runtime.lastRun && runtime.lastRun.ctxPct)) || null, steps: Number((lastRun && lastRun.steps) || 0), callsMax: Number(config.maxSteps) || 0 }; })(),
+    tokensTotal: (() => { const rows = Array.isArray(costs.runs) ? costs.runs : []; return rows.reduce((n, r) => n + Number((r.usage && r.usage.total) || 0), 0); })(),
   };
 }
 

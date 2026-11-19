@@ -368,7 +368,8 @@ export function apply(ctx, config = {}) {
         const minutes = Number((settings.kimi && settings.kimi.intervalMinutes) || 30);
         const text = buildKimiPrompt({ mailbox: settings.mailbox, intervalMinutes: minutes });
         const file = input.write ? writeKimiPrompt(path.join(workspace, '.dsh', 'kimi-prompt.md'), text) : null;
-        return json(res, 200, { ok: true, text, file, mailbox: settings.mailbox, intervalMinutes: minutes });
+        // 写盘（write=true）等于改了状态：带回快照，面板保存后立即反映，而不是等下一轮轮询。
+        return json(res, 200, { ok: true, text, file, mailbox: settings.mailbox, intervalMinutes: minutes, dashboard: input.write ? snapshot(workspace, config) : undefined });
       }
       if (action === 'guard.test') {
         if (!jobsService) return json(res, 200, { ok: false, error: 'jobs 服务不可用' });
