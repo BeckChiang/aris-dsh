@@ -1360,6 +1360,25 @@ ${text}
           }
         }
         saveConfig(root, { enabled: true });
+        // 「批准并重启」要立刻起一轮，而不是等下一次节拍（间隔可能 30 分钟）。
+        try {
+          if (isRunning(root)) {
+            resumed = { ...(resumed || {}), started: false, reason: '本轮进行中' };
+          } else {
+            const cfg2 = readConfig(root);
+            const job = runOnce({ workspace, root, config: cfg2, settings, hooks: null });
+            job.catch(() => {});
+            const deadline = Date.now() + 8000;
+            let rt = readRuntime(root);
+            while (Date.now() < deadline && !(rt && rt.pid)) {
+              await new Promise((r) => setTimeout(r, 200));
+              rt = readRuntime(root);
+            }
+            resumed = { ...(resumed || {}), started: Boolean(rt && rt.pid), runId: (rt && rt.runId) || null };
+          }
+        } catch (error) {
+          resumed = { ...(resumed || {}), started: false, error: String((error && error.message) || error) };
+        }
       }
       return { ok: true, file, resumed };
     }

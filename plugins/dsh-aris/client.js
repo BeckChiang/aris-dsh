@@ -1711,6 +1711,8 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
       const [newRoot, setNewRoot] = React.useState('');
       const [humanNotes, setHumanNotes] = React.useState({});
       const setHumanNote = (root, text) => setHumanNotes((prev) => ({ ...prev, [root]: text }));
+      // 提交答复后，等下一次轮询把 humanActions 刷新掉之前，先乐观收起这一块。
+      const [answered, setAnswered] = React.useState({});
       const [drawer, setDrawer] = React.useState(null);
       // 需人工横条上的「看稿件」：直接打开待裁决稿件的只读全文。
       const openHumanDraft = async (a) => {
@@ -1734,6 +1736,7 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
         try {
           const d = await getState();
           setData(d); setErr(''); setRefreshAt(Date.now());
+          if (!(((d && d.reviews && d.reviews.humanActions) || []).length)) setAnswered({});
           const st = (d && d.settings) || {};
           setForm((prev) => prev || {
             mailbox: st.mailbox || '',
@@ -1779,6 +1782,12 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
           const r = await post(name, input || {});
           if (r && r.dashboard) { setData(r.dashboard); setRefreshAt(Date.now()); }
           else if (r && r.ok !== false) { try { await load(); } catch { /* 拉取失败交给下一次轮询 */ } }
+          if (name === 'human.reply' && r && r.ok) {
+            setAnswered((prev) => ({ ...prev, [String((input && input.root) || '')]: 1 }));
+            setTimeout(() => { try { load(); } catch {} }, 1500);
+            const rs = r.resumed || null;
+            setToast(rs && rs.started ? '已提交并重启：新一轮已开始' : (rs && rs.reason ? '已提交答复：' + rs.reason : '已提交人工答复'));
+          }
           if (name === 'stop' && !(input && input.force)) {
             setToast(r && r.stopped ? '已停止' : '已登记停止：本轮跑完即停');
           } else if (r && r.ok === false) {
@@ -2124,7 +2133,7 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
         const items = (plan && plan.items) || [];
         const capN = Number(data.eventsPerCard) || 6;
         const events = (p.events || []).slice().reverse().slice(0, capN);
-        const needsHuman = st.key === 'human';
+        const needsHuman = st.key === 'human' && !answered[p.root];
         const waiting = Number(p.pending) > 0;
         const review = p.lastReview || null;
         const activity = p.activity || null;
