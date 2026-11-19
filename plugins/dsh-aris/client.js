@@ -232,6 +232,9 @@ table.daris2-tbl tbody tr.row.open td:first-child{background:var(--sel)}
 .daris2-sub-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;cursor:pointer;user-select:none;border-radius:8px}
 .daris2-sub-h:hover{background:rgba(127,127,127,.05)}
 .daris2-sub-h h4{color:var(--tx);margin:0;font-size:12.5px;font-weight:600}
+.daris2-tree-done-h{list-style:none;margin:6px 0 2px;font-size:11px;color:var(--tx3)}
+.daris2-tree-item.done span{color:var(--tx3)}
+.daris2-tree-item.done small{opacity:.85}
 .daris2-plan-grp{margin-top:12px}
 .daris2-plan-grp:first-child{margin-top:2px}
 .daris2-plan-grp .daris2-sub-h{margin:0 0 4px;align-items:center}
@@ -1709,7 +1712,8 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
           else if (states.every(value => value === 'pending')) status = 'pending';
           progress = completed + '/' + children.length + ' 个子阶段';
         }
-        const expandable = Boolean(items.length || children.length);
+        const doneItems = stage ? (stage.doneItems || []) : [];
+        const expandable = Boolean(items.length || children.length || doneItems.length);
         const row = h(expandable ? 'summary' : 'div', { className: 'daris2-trow' },
           h('span', { className: 'daris2-tdot ' + (colors[status] || '') }),
           h('b', { title: name }, name),
@@ -1717,7 +1721,12 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
         return h('li', { key: name }, expandable
           ? h('details', { open: force ? force.open : children.length > 0 || status === 'in_progress' }, row,
             h('ul', null, items.map((item, index) => h('li', { key: index, className: 'daris2-tree-item' },
-              h('span', null, item.text), h('small', null, item.done ? '已完成' : '未完成'))), children.map(branch)))
+              h('span', null, item.text), h('small', null, item.done ? '已完成' : '未完成'))),
+              doneItems.length ? h('li', { className: 'daris2-tree-done-h' }, '已完成 ' + doneItems.length + ' 项') : null,
+              doneItems.map((item, index) => h('li', { key: 'd' + index, className: 'daris2-tree-item done' },
+                h('span', { title: [item.text, item.at, item.runId].filter(Boolean).join(' | ') }, item.text),
+                h('small', null, item.verdict || '已完成'))),
+              children.map(branch)))
           : row);
       }
       return h('ul', { className: 'daris2-tree' }, roots.map(branch));
