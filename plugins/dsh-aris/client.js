@@ -1843,6 +1843,7 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
       const stateOf = (p) => {
         if (p.lastError) return { key: 'error', label: '出错', cls: 'error' };
         if (p.stage && p.stage.status === 'blocked_on_user') return { key: 'human', label: '等待人工', cls: 'human' };
+        if (humanHot.has(p.name)) return { key: 'human', label: '需人工', cls: 'human' };
         if (p.stopping) return { key: 'stopping', label: '停止中', cls: 'stopping' };
         if (p.running) return { key: 'run', label: '正在运行', cls: 'run' };
         if (!p.enabled) return { key: 'stop', label: '已停止', cls: 'stop' };
@@ -1850,7 +1851,7 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
         return { key: 'idle', label: '空闲', cls: 'idle' };
       };
       const kindOf = (p) => stateOf(p).key;
-      const LABEL = { error: '出错', human: '等待人工', stopping: '停止中', run: '正在运行', review: '待审', stop: '已停止', idle: '空闲' };
+      const LABEL = { error: '出错', human: '需人工', stopping: '停止中', run: '正在运行', review: '待审', stop: '已停止', idle: '空闲' };
       const ORDER = { error: 0, human: 1, run: 2, review: 3, stopping: 4, idle: 5, stop: 6 };
 
       if (!data) {
@@ -1867,6 +1868,9 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
       }
 
       const allPipes = data.pipelines || [];
+      // 审稿侧点名要人处理的流水线（封顶 / 多轮退回 / 等待人工）：状态列改说「需人工」，
+      // 免得流水线还在跑、但面板另一处又说要人处理，两处互相打脸。
+      const humanHot = new Set(((data.reviews || {}).humanActions || []).map((a) => a && a.name).filter(Boolean));
       const names=Array.from(new Set(allPipes.map(p=>p.name).concat(tab==='review'?(data.reviews?.groups||[]).map(g=>g.name).filter(Boolean):[])));
       const scopeName=names.includes(rvPipe)?rvPipe:'';
       const pipes = scopeName ? allPipes.filter((p) => p.name === scopeName) : allPipes;
@@ -2230,7 +2234,7 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
                 h('div', { className: 'daris2-rail' }, stg.slice(0, 12).map((x, i) => h('i', { key: i, className: x.status === 'done' ? 'done' : x.status === 'in_progress' ? 'cur' : '' }))),
                 h('div', { className: 'daris2-cell2 s' }, stg.length ? `${stg.filter((x) => x.status === 'done').length}/${stg.length}` : '')),
               h('td', null, h('div', { className: 'daris2-now' },
-                (p.activity && p.activity.text) || (p.blocked ? '等待裁决 · ' + (plan.block && plan.block.reason || p.blocked) : p.lastRun ? '上轮 ' + (p.lastRun.verdict || '完成') : (!p.enabled ? '已停用 · 不参与节拍' : '空闲'))),
+                (p.running ? '运行中 · ' : '') + ((p.activity && p.activity.text) || (p.blocked ? '等待裁决 · ' + (plan.block && plan.block.reason || p.blocked) : p.lastRun ? '上轮 ' + (p.lastRun.verdict || '完成') : (!p.enabled ? '已停用 · 不参与节拍' : '空闲')))),
               h('div', { className: 'daris2-now-s' }, p.history && p.history[0] ? `${p.history[0].steps} 步 · ${Math.max(1, Math.round((p.history[0].ms || 0) / 60000))} 分钟 · 上下文 ${p.budget && p.budget.ctxPct != null ? p.budget.ctxPct + '%' : '—'}` : '—')),
               h('td', { className: 'num' }, gates.total ? `${gates.done}/${gates.total}` : '—'),
               h('td', { className: 'num' }, (p.blockers && p.blockers.length) ? h('span', { className: 'daris2-badge human' }, p.blockers.length) : '—'),
@@ -2276,7 +2280,7 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
         const capPct = capCny > 0 ? Math.round((todayCny / capCny) * 100) : 0;
         const kpi = [
           ['在跑', pipes.filter((p) => p.running).length, '/ ' + pipes.length + ' 条', 'run'],
-          ['需人工', pipes.filter((p) => ['human', 'error'].includes(kindOf(p))).length, '条待裁决', 'human'],
+          ['需人工', humanAll.length, humanAll.length ? '条待裁决' : '无待裁决', 'human'],
           ['等审核', sum((p) => p.pending), '轮未送审', 'review'],
           ['等回件', mb.pending || 0, '封 Kimi 邮箱', 'review'],
           ['今日轮数', sum((p) => (p.today && p.today.runs) || 0), `上限 ¥${capCny} · 已用 ${capPct}%`, 'idle'],
