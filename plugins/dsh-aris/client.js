@@ -1074,6 +1074,13 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
 
     // 审核结果：两条通道的审稿产物按结论分类，集中在一处看
     const VERD_LABEL = { accept: '通过', revise: '需修改', reject: '退回', unknown: '未知' };
+    // 最新一份审稿的 MUST / SHOULD 条数（两种审稿 md 写法都在后端归一）
+    const mustOf = (g) => {
+      const m = Number((g && g.mustCount) || 0);
+      const sh = Number((g && g.shouldCount) || 0);
+      if (!m && !sh) return '';
+      return 'MUST ' + m + ' · SHOULD ' + sh;
+    };
     const CH_LABEL = { kimi: 'Kimi', gpt: 'GPT', human: '人工', other: '其他' };
 
     function ReviewResults(props) {
@@ -1144,7 +1151,8 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
             h('span', null, (l.name && l.name !== g.name) ? l.name : (g.scope || l.name || key)),
             h('span', { className: 's' }, `${rounds ? '第 ' + rounds + ' 轮' : '第 1 轮'}${g.historyCount > 1 ? ' · 历史 ' + (g.historyCount - 1) + ' 轮' : ''}`))),
           h('td', null, h('span', { className: 'daris2-badge ' + (v === 'accept' ? 'run' : v === 'reject' ? 'error' : v === 'revise' ? 'stopping' : 'idle') }, VERD_LABEL[v] || '未知'),
-            l.acceptance ? h('div', { className: 'daris2-cell2' }, h('span', { className: 's' }, l.acceptance)) : null),
+            l.acceptance ? h('div', { className: 'daris2-cell2' }, h('span', { className: 's' }, l.acceptance)) : null,
+            mustOf(g) ? h('div', { className: 'daris2-cell2' }, h('span', { className: 's' }, mustOf(g))) : null),
           h('td', { className: 'num' }, l.score != null ? h('span', null, l.score, h('span', { className: 's', style: { fontSize: 11, color: 'var(--tx3)' } }, '/10')) : '—'),
           h('td', null, h('div', { className: 'daris2-cell2' },
             h('span', null, CH_LABEL[chan(g)] || chan(g)),
@@ -1155,7 +1163,7 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
         bodyRows.push(h('tr', { key: key + '-x', className: 'xr' }, h('td', { colSpan: 7 },
           h('div', { style: { padding: '4px 2px 10px' } },
             (g.must && g.must.length)
-              ? h('div', null, h('div', { className: 'daris-sub' }, `MUST · ${g.must.length} 条`),
+              ? h('div', null, h('div', { className: 'daris-sub' }, `MUST ${Number(g.mustCount || g.must.length)} 条 · SHOULD ${Number(g.shouldCount || 0)} 条`),
                 h('ul', { className: 'daris-err-list', style: { margin: '4px 0 8px 18px' } }, g.must.slice(0, 8).map((m, i) => h('li', { key: i }, String(m)))))
               : null,
             (g.history && g.history.length)
@@ -1904,6 +1912,18 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
         }
         return Array.from(counts, ([k,v]) => (({accept:'通过',revise:'需修改',reject:'退回',unknown:'未知'})[k] || k)+' '+v).join(' · ') || '暂无稿件记录';
       };
+      // 最新一份审稿里的 MUST / SHOULD 条数：审稿 md 两种写法都算（MUST 段 / 主要问题段）
+      const mustLine = (name) => {
+        const g = rvGroups.find((x) => x.name === name);
+        if (!g) return '';
+        const m = Number(g.mustCount || 0);
+        const sh = Number(g.shouldCount || 0);
+        if (!m && !sh) return '';
+        return 'MUST ' + m + ' · SHOULD ' + sh;
+      };
+      const seriesGroups = rvGroups.filter((g) => !rvPipe || (g.latest && String(g.latest.name) === rvPipe));
+      const mustSum = seriesGroups.reduce((n, g) => n + Number(g.mustCount || 0), 0);
+      const shouldSum = seriesGroups.reduce((n, g) => n + Number(g.shouldCount || 0), 0);
       const rvTotal = rv.total != null ? rv.total : rvGroups.length;
       const humanAll = (rv.humanActions || []).filter((a) => !scopeName || a.name === scopeName);
       const cx = data.codex || {};
@@ -2017,7 +2037,7 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
                         h('td', { className: 'num' }, x.exit != null ? String(x.exit) : '—')))))))),
               h('div', { className: 'daris2-colside' },
                 foldTools('阶段与结论',setSideFold),
-                h(Pane, { force:sideFold, title: '结论分布', meta: '最近 6 轮', defaultOpen: true },
+                h(Pane, { force:sideFold, title: '结论分布', meta: ['最近 6 轮', mustLine(p.name)].filter(Boolean).join(' · '), defaultOpen: true },
                   h(PieBox, { segs: pieSegs })),
                 h(Pane, { force:sideFold, title: '阶段树', meta: stages.length + ' 个阶段 · 点状态看颜色', defaultOpen: true },
                   h('div', { className: 'daris2-tree' },
@@ -2252,7 +2272,8 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
               h('td', { className: 'num' }, (p.blockers && p.blockers.length) ? h('span', { className: 'daris2-badge human' }, p.blockers.length) : '—'),
               h('td', null, p.pending ? h('span', { className: 'daris2-badge review' }, `${p.pending} 轮未送审`) : h('span', { className: 'daris2-cell2 s' }, '无待送审'),
                 h('div', { className:'daris2-cell2 s' }, reviewCounts(p.name)),
-                h('div', { className: 'daris2-cell2 s' }, p.lastReview ? `${p.lastReview.verdict || ''}${p.lastReview.score != null ? ' ' + p.lastReview.score : ''}` : '未审')),
+                h('div', { className: 'daris2-cell2 s' }, p.lastReview ? `${p.lastReview.verdict || ''}${p.lastReview.score != null ? ' ' + p.lastReview.score : ''}` : '未审'),
+                mustLine(p.name) ? h('div', { className: 'daris2-cell2 s' }, mustLine(p.name)) : null),
               h('td', { className: 'num' }, h('div', null, '¥' + (((p.today && p.today.cny) || 0)).toFixed(2)),
                 h('div', { className: 'daris2-cell2 s' }, `${(p.totals && p.totals.runs) || 0} 轮 · ¥${((p.totals && p.totals.cny) || 0).toFixed(2)}`)),
               h('td', null, h('div', null, p.nextAt && !p.running ? ft(p.nextAt) : h('span', { className: 'daris2-cell2 s' }, p.running ? '本轮结束后' : (p.enabled ? '未排期' : '已停用'))),
@@ -2425,7 +2446,8 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
             h('div', { className: 'daris2-card' },
               h('div', { className: 'daris2-card-h' },
                 '结论分布',
-                h('span', { className: 'daris2-tag', style: { marginLeft: 'auto' } }, `${scopeTotal} 份`)),
+                h('span', { className: 'daris2-tag', style: { marginLeft: 'auto' } },
+                  `${scopeTotal} 份` + (mustSum || shouldSum ? ` · MUST ${mustSum} · SHOULD ${shouldSum}` : ''))),
               h('div', { className: 'daris2-card-b' },
                 h(PieBox, { segs: pie(scopeBy, { accept: '#18794e', revise: '#b45309', reject: '#b42318', unknown: '#8a8a8a' }, { accept: '通过', revise: '需修改', reject: '退回', unknown: '未知' }) }))),
             h('div', { className: 'daris2-card' },

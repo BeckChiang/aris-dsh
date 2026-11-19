@@ -318,6 +318,9 @@ ${note}
 `;
 }
 
+/** 送审前额度查询入口（bin/aris-quota.mjs）：提示词里给流水线执行者直接跑。 */
+const QUOTA_CLI = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..', '..', 'bin', 'aris-quota.mjs');
+
 /** 提示词版本：默认模板每次结构性变化就加一；流水线的 prompt.md 按此判断是否过期。 */
 export function defaultPrompt(root, driver, config, settings, runId = '') {
   const stateRel = driver === 'frrs' ? config.frrs.state || 'pipeline/state.json' : path.join(config.aris.stateDir || '.aris', 'state.json');
@@ -336,6 +339,7 @@ export function defaultPrompt(root, driver, config, settings, runId = '') {
       '6. 完整做完一个子项且全绿才送审（每轮≤1 次）：dataset_gen 下拼 review_package_<scope>_r<轮>.md（首行 <!-- focused: true; scope: <scope>; round: <n> -->，含改动、证据、单测尾部，≤30000 字节），再',
       '   PYTHONIOENCODING=utf-8 python pipeline/review/mailbox_bridge.py --state-dir .aris --mailbox {{MAILBOX}} send --package <包> --tier review --out <out 路径> --scope <scope> --round <n>',
       '   全局参数（--state-dir/--mailbox）必须放在 send 之前；exit 0 且邮箱 queue.md 出现该请求才算入队；非 0 不绕过，写进 runs 日志；没送审则记「送审跳过：<缺什么>」。',
+      `   **送审前必须先查额度**：跑 \`node ${QUOTA_CLI}\`，输出一行 JSON；\`blocked=true\` 时不要调用 mailbox_bridge（别浪费物理送审次数、别写 attempts），把本轮记成「送审跳过：等额度，<freeAt> 之后恢复」，继续下一个原子块或正常收尾。`,
       '   送审前自检：把该 scope 未关闭 MUST 的复现命令、diff、测试输出逐条列进包内证据（r5 是最终验收包，尤须如此）。',
       '   exit 8、gate=escalate/manual 或额度已尽 → 不送第 N+1 次，立即把 pipeline/state.json 置 blocked_on_user 并整理人工清单（bridge 已写 cap-review_*.md），等待人工裁决。',
       '7. 收尾 `gate.py … A --finish`：已送审加 `--async-wait`，无进展用 `--no-progress`。不改 Kimi automation / PIPELINE.md，不伪造结果。',
@@ -360,7 +364,7 @@ export function defaultPrompt(root, driver, config, settings, runId = '') {
     '最后必须打印一行：RESULT: <done|idle|blocked> <一句话>。',
   ].join('\n');
 }
-export const PROMPT_VERSION = 8;
+export const PROMPT_VERSION = 9;
 
 function promptMetaFile(root) {
   return path.join(runDir(root), 'prompt.meta.json');

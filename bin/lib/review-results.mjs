@@ -90,6 +90,38 @@ function mustLines(file, max = 4) {
     .slice(0, max);
 }
 
+// 统计审稿 md 里各段落有多少条（MUST / SHOULD / OPTIONAL 都是「- 」开头的条）。
+function sectionCounts(file) {
+  let text = '';
+  try {
+    text = fs.readFileSync(file, 'utf8');
+  } catch {
+    return { must: 0, should: 0, optional: 0 };
+  }
+  // 按二级标题切段，统计每段里的列表条目（1. / 1) / - / *）
+  const lines = text.split(/\r?\n/);
+  const countBy = {};
+  for (let i = 0; i < lines.length; i += 1) {
+    const m = /^##+\s*([^\s:：]+)/.exec(lines[i]);
+    if (!m) continue;
+    const key = m[1];
+    const buf = [];
+    let j = i + 1;
+    while (j < lines.length && !/^##+\s/.test(lines[j])) {
+      buf.push(lines[j]);
+      j += 1;
+    }
+    const n = buf.filter((l) => /^\s*(?:[-*]|\d+[.)])\s+\S/.test(l)).length;
+    if (!(key in countBy)) countBy[key] = n;
+    i = j - 1;
+  }
+  // 两种常见审稿格式：MUST/SHOULD/OPTIONAL，或「主要问题 / 次要问题」
+  const must = countBy.MUST != null ? countBy.MUST : (countBy['主要问题'] || 0);
+  const should = countBy.SHOULD != null ? countBy.SHOULD : (countBy['次要问题'] || 0);
+  const optional = countBy.OPTIONAL || 0;
+  return { must, should, optional };
+}
+
 // 人工回复（.aris-run/human-note.md）的时间：比它更旧的「要人处理」视为已答复
 function latestHumanNoteAt(root) {
   try {
@@ -317,8 +349,11 @@ export function collectReviewResults(workspace, opts = {}) {
     const rounds = Math.max(...list.map((x) => x.round || 0), list.length);
     // 只给「最新且未通过」的那条抠 MUST，免得读一堆历史文件
     let must = [];
+    let counts = { must: 0, should: 0, optional: 0 };
     if (latest.verdict === 'revise' || latest.verdict === 'reject') {
-      must = mustLines(path.join(latest.root, latest.mdRel || latest.rel));
+      const mdFile = path.join(latest.root, latest.mdRel || latest.rel);
+      must = mustLines(mdFile);
+      counts = sectionCounts(mdFile);
     }
     groups.push({
       key,
@@ -331,6 +366,9 @@ export function collectReviewResults(workspace, opts = {}) {
       history: list.slice(1),
       latestCount: list.length,
       must,
+      mustCount: counts.must,
+      shouldCount: counts.should,
+      optionalCount: counts.optional,
     });
   }
   groups.sort((a, b) => (b.latest.atMs || 0) - (a.latest.atMs || 0));
@@ -368,6 +406,9 @@ export function collectReviewResults(workspace, opts = {}) {
       historyCount: g.history.length,
       latest: g.latest,
       must: g.must,
+      mustCount: g.mustCount || 0,
+      shouldCount: g.shouldCount || 0,
+      optionalCount: g.optionalCount || 0,
       history: g.history.slice(0, 20),
     })),
     latestTotal: latestItems.length,
