@@ -977,7 +977,10 @@ export function snapshot(workspace, config = {}) {
         if (gate && gate.blocked && /连续\s*3\s*次失败/.test(String(gate.reason || ''))) {
           extra.push({ kind: 'failures', level: 'bad', name: 'GPT 外审', title: '连续失败已停摆', detail: gate.reason, at: '', file: '' });
         } else if (gate && gate.blocked && gate.freeAt) {
-          extra.push({ kind: 'quota', level: 'warn', name: 'GPT 外审', title: '本小时额度用完', detail: `已用 ${gate.used}/${gate.limit}，${String(gate.freeAt).slice(11, 16)} 之后恢复`, at: '', file: '' });
+          // 小时额度只是等待，不是人要做的事：单独给面板一条提示，不进 humanActions
+          rv.quotaNote = { kind: 'quota', level: 'warn', name: 'GPT 外审', title: '本小时额度用完', detail: `已用 ${gate.used}/${gate.limit}，${String(gate.freeAt).slice(11, 16)} 之后自动恢复；期间不送审、不占送审次数`, freeAt: gate.freeAt, used: gate.used, limit: gate.limit };
+        } else {
+          rv.quotaNote = null;
         }
         if (extra.length) rv.humanActions = [...extra, ...(rv.humanActions || [])];
         // 红色（真要人动手）排前面，琥珀（看着点）在后

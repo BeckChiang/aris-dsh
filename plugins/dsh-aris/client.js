@@ -104,6 +104,8 @@ body[data-ds-dark-theme] table.daris2-tbl th{color:var(--tx2)}
 .daris2-tag.warn{color:var(--dsw-alias-state-warn-primary,#b45309);background:color-mix(in srgb,var(--dsw-alias-state-warn-primary,#b45309) 12%,transparent)}
 .daris2-tag.bad{color:var(--dsw-alias-state-error-primary,#b42318);background:color-mix(in srgb,var(--dsw-alias-state-error-primary,#b42318) 11%,transparent)}
 .daris2-band{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 12px;border-radius:10px;margin:10px 0;font-size:12.5px;border:1px solid}
+.daris2-quota-band{margin:0 0 10px;align-items:flex-start}
+.daris2-quota-note{color:var(--tx2)}
 .daris2-band.warn{background:color-mix(in srgb,var(--dsw-alias-state-warn-primary,#b45309) 8%,transparent);border-color:color-mix(in srgb,var(--dsw-alias-state-warn-primary,#b45309) 30%,transparent);color:var(--tint-warn)}
 .daris2-band.err{background:color-mix(in srgb,var(--dsw-alias-state-error-primary,#b42318) 8%,transparent);border-color:color-mix(in srgb,var(--dsw-alias-state-error-primary,#b42318) 30%,transparent);color:var(--tint-err)}
 .daris2-band.info{background:var(--a-bg);border-color:color-mix(in srgb,var(--a) 30%,transparent);color:var(--tint-info)}
@@ -162,9 +164,15 @@ table.daris2-tbl tbody tr.row.open td:first-child{background:var(--sel)}
 /* 阶段树 */
 .daris2-tree{display:flex;flex-direction:column;gap:1px;font-size:12px}
 .daris2-trow{position:relative;display:flex;align-items:center;gap:7px;height:24px;padding-left:2px}
-.daris2-trow.d1{padding-left:18px}
-.daris2-trow.d2{padding-left:36px}
-.daris2-trow .tline{position:absolute;left:5px;top:0;bottom:0;width:1px;background:var(--ln)}
+.daris2-tree,.daris2-tree ul{list-style:none;margin:0;padding:0}
+.daris2-tree ul{margin-inline-start:6px;padding-inline-start:16px;border-inline-start:1px solid var(--ln)}
+.daris2-tree ul>li{position:relative}
+.daris2-tree ul>li::before{content:"";position:absolute;inset-inline-start:-16px;top:11px;width:12px;border-top:1px solid var(--ln)}
+.daris2-tree summary{cursor:pointer}
+.daris2-tree summary::before{content:'▸';color:var(--tx3)}
+.daris2-tree details[open]>summary::before{content:'▾'}
+.daris2-tree .daris2-tree-item{display:flex;align-items:baseline;gap:8px;padding:3px 2px;overflow-wrap:anywhere}
+.daris2-tree-item small{margin-inline-start:auto;white-space:nowrap;color:var(--tx3)}
 .daris2-tdot{width:7px;height:7px;border-radius:50%;flex:none;background:rgba(127,127,127,.45);box-shadow:0 0 0 2.5px var(--dsw-alias-bg-base,#fff)}
 .daris2-tdot.done{background:var(--dsw-alias-state-success-primary,#18794e)}
 .daris2-tdot.cur{background:var(--a);box-shadow:0 0 0 2.5px var(--dsw-alias-bg-base,#fff),0 0 0 5px var(--a-bg)}
@@ -1648,6 +1656,62 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
     }
 
     // 折叠卡（对齐 mock .m-sec.m-fold）：详情默认展开，审核默认收起。
+    function StageTree({ stages, force }) {
+      if (!stages.length) return h('div', { className: 'daris2-cell2 s' }, '没有阶段数据');
+      const roots = [];
+      const families = new Map();
+      for (const stage of stages) {
+        const match = /^S(\d+)([a-z])?(?=[_\s-]|$)/i.exec(stage.name);
+        if (!match) {
+          roots.push({ stage });
+          continue;
+        }
+        const id = 'S' + match[1];
+        if (!families.has(id)) {
+          const family = { id, children: [] };
+          roots.push(family);
+          families.set(id, family);
+        }
+        const family = families.get(id);
+        if (!match[2] && !family.stage) family.stage = stage;
+        else family.children.push({ stage });
+      }
+      const labels = { done: '已完成', in_progress: '进行中', pending: '待开始', blocked: '受阻' };
+      const colors = { done: 'done', in_progress: 'cur', blocked: 'err' };
+      function branch(node) {
+        const stage = node.stage;
+        const name = stage ? stage.name : node.id;
+        const children = node.children || [];
+        const items = stage ? (stage.items || []) : [];
+        const done = items.filter(item => item.done).length;
+        let status = stage && stage.status;
+        let progress = '';
+        if (stage) {
+          if (items.length) progress = done + '/' + items.length;
+          else if (stage.done != null && stage.total != null) progress = stage.done + '/' + stage.total;
+        } else {
+          const completed = children.filter(child => child.stage.status === 'done').length;
+          const states = children.map(child => child.stage.status);
+          if (completed === children.length) status = 'done';
+          else if (states.includes('blocked')) status = 'blocked';
+          else if (states.includes('in_progress') || completed) status = 'in_progress';
+          else if (states.every(value => value === 'pending')) status = 'pending';
+          progress = completed + '/' + children.length + ' 个子阶段';
+        }
+        const expandable = Boolean(items.length || children.length);
+        const row = h(expandable ? 'summary' : 'div', { className: 'daris2-trow' },
+          h('span', { className: 'daris2-tdot ' + (colors[status] || '') }),
+          h('b', { title: name }, name),
+          h('span', { className: 'tmeta' }, [labels[status] || status || '状态未知', progress].filter(Boolean).join(' ')));
+        return h('li', { key: name }, expandable
+          ? h('details', { open: force ? force.open : children.length > 0 || status === 'in_progress' }, row,
+            h('ul', null, items.map((item, index) => h('li', { key: index, className: 'daris2-tree-item' },
+              h('span', null, item.text), h('small', null, item.done ? '已完成' : '未完成'))), children.map(branch)))
+          : row);
+      }
+      return h('ul', { className: 'daris2-tree' }, roots.map(branch));
+    }
+
     function Pane(props) {
       const [open, setOpen] = React.useState(props.defaultOpen !== false);
       React.useEffect(()=>{if(props.force)setOpen(props.force.open)},[props.force]);
@@ -1942,14 +2006,19 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
         const plan = p.plan || {};
         const stages = plan.stages || [];
         const stageName = (p.stage && p.stage.stage) || plan.current || '—';
-        const rawItems = (plan.items && plan.items.length ? plan.items : ((stages.filter((x) => x.name === stageName)[0] || {}).items || []));
-        const mapItem = (it) => (typeof it === 'string' ? { text: it.replace(/^✅\s*/, ''), done: /^✅/.test(it) } : { text: String(it.text || '').replace(/^✅\s*/, ''), done: !!it.done || /^✅/.test(String(it.text || '')) });
-        const planItems = rawItems.map(mapItem);
-        const planGroups = (() => {
-          const list = stages.filter((sg) => (sg.items || []).length).map((sg) => ({ name: sg.name || '—', status: sg.status || '', items: (sg.items || []).map(mapItem) }));
-          if (list.length) return list;
-          return planItems.length ? [{ name: stageName || '当前阶段', status: '', items: planItems }] : [];
-        })();
+        const hasCurrentItems = (plan.items || []).length > 0;
+        const stageList = hasCurrentItems && !stages.some(stage => stage.name === stageName)
+          ? [...stages, { name: stageName, status: plan.currentStatus, items: plan.items }]
+          : stages;
+        const treeStages = stageList.map(stage => {
+          const source = stage.items && stage.items.length ? stage.items : stage.name === stageName ? plan.items : [];
+          const items = (source || []).map(item => {
+            const text = typeof item === 'string' ? item : String(item.text || '');
+            return { text: text.replace(/^✅\s*/, ''), done: stage.status === 'done' || !!item.done || /^✅/.test(text) };
+          });
+          return { ...stage, items };
+        });
+        const planItemCount = treeStages.reduce((count, stage) => count + stage.items.length, 0);
         const activity = p.activity || null;
         const last = p.lastRun || null;
         const hist = (p.history || []).slice().reverse();
@@ -2004,17 +2073,17 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
                   (p.blockers || []).length
                     ? h('div', { className: 'daris2-note' }, (p.blockers || []).map((b, i) => h('div', { key: i }, '· [' + b.severity + '] ' + b.text)))
                     : null),
-                h(Pane, { force:mainFold, title: '计划项', meta: planGroups.length + ' 个阶段 · 共 ' + planItems.length + ' 项 · 按阶段分组', defaultOpen: true },
-                  planGroups.length
-                    ? h('div', null, planGroups.map((grp, gi) => {
+                h(Pane, { force:mainFold, title: '计划项', meta: treeStages.length + ' 个阶段 · 共 ' + planItemCount + ' 项 · 按阶段分组', defaultOpen: true },
+                  treeStages.length
+                    ? h('div', null, treeStages.map((grp, gi) => {
                       const gDoneN = grp.items.filter((x) => x.done).length;
                       return h('div', { key: gi, className: 'daris2-plan-grp' },
                         h('div', { className: 'daris2-sub-h' },
                           h('span', { className: 'daris2-tdot ' + (grp.status === 'done' ? 'done' : grp.status === 'in_progress' ? 'cur' : '') }),
                           h('h4', null, grp.name),
-                          h('span', { className: 'meta' }, grp.items.length + ' 项 · 完成 ' + gDoneN + '/' + grp.items.length),
+                          h('span', { className: 'meta' }, grp.items.length ? grp.items.length + ' 项 · 完成 ' + gDoneN + '/' + grp.items.length : [({ done: '已完成', in_progress: '进行中', pending: '待开始', blocked: '受阻' })[grp.status] || grp.status, '无计划项'].filter(Boolean).join(' · ')),
                           h('span', { className: 'sp' })),
-                        h('table', { className: 'daris2-plantbl' }, h('tbody', null, grp.items.map((it, i) => h('tr', { key: i },
+                        grp.items.length > 0 && h('table', { className: 'daris2-plantbl' }, h('tbody', null, grp.items.map((it, i) => h('tr', { key: i },
                           h('td', { className: 'st' }, h('span', { className: 'daris2-tdot ' + (it.done ? 'done' : '') }), it.done ? '已完成' : '待办'),
                           h('td', { className: 'tx', title: it.text }, (i + 1) + '. ' + cap(it.text, 90)))))));
                     }))
@@ -2040,14 +2109,8 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
                 foldTools('阶段与结论',setSideFold),
                 h(Pane, { force:sideFold, title: '结论分布', meta: ['最近 6 轮', mustLine(p.name)].filter(Boolean).join(' · '), defaultOpen: true },
                   h(PieBox, { segs: pieSegs })),
-                h(Pane, { force:sideFold, title: '阶段树', meta: stages.length + ' 个阶段 · 点状态看颜色', defaultOpen: true },
-                  h('div', { className: 'daris2-tree' },
-                    stages.length
-                      ? stages.map((sg, i) => h('div', { key: i, className: 'daris2-trow' + (i === 0 ? ' d0' : '') },
-                        h('span', { className: 'daris2-tdot ' + (sg.status === 'done' ? 'done' : sg.status === 'in_progress' ? 'cur' : '') }),
-                        h('b', null, sg.name),
-                        h('span', { className: 'tmeta' }, sg.status === 'done' ? '已完成 ' + sg.done + '/' + sg.total : sg.status === 'in_progress' ? '进行中 ' + sg.done + '/' + sg.total : '待开始 ' + sg.done + '/' + sg.total)))
-                      : h('div', { className: 'daris2-cell2 s' }, '没有阶段数据')),
+                h(Pane, { force:sideFold, title: '阶段树', meta: treeStages.length + ' 个阶段 · 展开查看子项', defaultOpen: true },
+                  h(StageTree, { key: p.root || p.name, stages: treeStages, force: sideFold }),
                 ),
                 h(Pane, { force:sideFold, title: '总计划', meta: (plan.percent != null ? plan.percent + '%' : '—') + ' · 完成 ' + (plan.done || 0) + '/' + (plan.total || 0) + (stageName ? ' · 当前 ' + stageName : ''), defaultOpen: true },
                   h('div', { className: 'daris2-prog' }, h('i', { style: { width: (plan.percent || 0) + '%' } })),
@@ -2439,7 +2502,11 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
           const segs = Object.keys(obj).filter((k) => obj[k]).map((k) => ({ label: (names && names[k]) || k, value: obj[k], color: (colors && colors[k]) || '#8a8a8a' }));
           return segs;
         };
+        const quotaNote = rv.quotaNote;
         body = h('div', null,
+          quotaNote ? h('div', { className: 'daris2-band warn daris2-quota-band' },
+            h('b', null, 'GPT 外审 · 本小时额度用完'),
+            h('span', { className: 'daris2-quota-note' }, `已用 ${quotaNote.used}/${quotaNote.limit}，${String(quotaNote.freeAt || '').slice(11, 16)} 之后自动恢复；期间不送审、不占用送审次数`)) : null,
           h('section', { className:'daris2-card daris2-review-summary' },
             h('div',{className:'daris2-card-h'},'审核概览',h('small',null,'当前范围 · '+(scopeName||'全部流水线')),
               h(Btn,{label:'全局审核线路 · '+((cx.route && cx.route.channel)||'auto')+'　查看设置',onClick:()=>{setRouteFocus({v:true,n:Date.now()});setTab('settings')}})),
