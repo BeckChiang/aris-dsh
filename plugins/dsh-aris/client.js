@@ -235,6 +235,7 @@ table.daris2-tbl tbody tr.row.open td:first-child{background:var(--sel)}
 .daris2-tree-done-h{list-style:none;margin:6px 0 2px;font-size:11px;color:var(--tx3)}
 .daris2-tree-item.done span{color:var(--tx3)}
 .daris2-tree-item.done small{opacity:.85}
+.daris2-tree-more{list-style:none;margin:2px 0 0;font-size:11px;color:var(--tx3)}
 .daris2-plan-grp{margin-top:12px}
 .daris2-plan-grp:first-child{margin-top:2px}
 .daris2-plan-grp .daris2-sub-h{margin:0 0 4px;align-items:center}
@@ -1717,15 +1718,12 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
         const row = h(expandable ? 'summary' : 'div', { className: 'daris2-trow' },
           h('span', { className: 'daris2-tdot ' + (colors[status] || '') }),
           h('b', { title: name }, name),
-          h('span', { className: 'tmeta' }, [labels[status] || status || '状态未知', progress].filter(Boolean).join(' ')));
+          h('span', { className: 'tmeta' }, [labels[status] || status || '状态未知', progress, doneItems.length ? '已记 ' + doneItems.length + ' 项' : ''].filter(Boolean).join(' ')));
         return h('li', { key: name }, expandable
           ? h('details', { open: force ? force.open : children.length > 0 || status === 'in_progress' }, row,
-            h('ul', null, items.map((item, index) => h('li', { key: index, className: 'daris2-tree-item' },
-              h('span', null, item.text), h('small', null, item.done ? '已完成' : '未完成'))),
-              doneItems.length ? h('li', { className: 'daris2-tree-done-h' }, '已完成 ' + doneItems.length + ' 项') : null,
-              doneItems.map((item, index) => h('li', { key: 'd' + index, className: 'daris2-tree-item done' },
-                h('span', { title: [item.text, item.at, item.runId].filter(Boolean).join(' | ') }, item.text),
-                h('small', null, item.verdict || '已完成'))),
+            h('ul', null, items.slice(0, 6).map((item, index) => h('li', { key: index, className: 'daris2-tree-item' },
+              h('span', { title: item.text }, (String(item.text).length > 46 ? String(item.text).slice(0, 46) + '…' : String(item.text))), h('small', null, item.done ? '已完成' : '未完成'))),
+              items.length > 6 ? h('li', { className: 'daris2-tree-more' }, '还有 ' + (items.length - 6) + ' 项') : null,
               children.map(branch)))
           : row);
       }
