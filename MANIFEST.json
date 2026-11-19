@@ -1,11 +1,11 @@
 {
   "repo": "BeckChiang/aris-dsh",
-  "generated_at": "2026-11-19T14:33:00.077Z",
+  "generated_at": "2026-11-19T15:25:05.073Z",
   "note": "由 scripts/sync.mjs 从本机 DSH 工作区单向生成；本文件为发布快照标识，请勿手改。",
   "rules_version": 1,
   "counts": {
     "files": 682,
-    "bytes": 13178079
+    "bytes": 13180524
   },
   "excluded": [
     "tests",
@@ -3249,8 +3249,8 @@
     },
     {
       "p": "bin/lib/aris-control.mjs",
-      "sha256": "665de58f1ae2f6e6",
-      "bytes": 64549
+      "sha256": "0edad87cde0d4e22",
+      "bytes": 64932
     },
     {
       "p": "bin/lib/aris-cost.mjs",
@@ -3279,8 +3279,8 @@
     },
     {
       "p": "bin/lib/aris-runner.mjs",
-      "sha256": "41e1dd44fa0da460",
-      "bytes": 60971
+      "sha256": "e710efb6b9b4485e",
+      "bytes": 61191
     },
     {
       "p": "bin/lib/aris-state.mjs",
@@ -3344,8 +3344,8 @@
     },
     {
       "p": "docs/ARIS-流水线与面板手册.md",
-      "sha256": "8861e83aa5a6e547",
-      "bytes": 72038
+      "sha256": "6b9728bb90945a2d",
+      "bytes": 72146
     },
     {
       "p": "LICENSE",
@@ -3354,8 +3354,8 @@
     },
     {
       "p": "plugins/dsh-aris/client.js",
-      "sha256": "5b9de34316442774",
-      "bytes": 211272
+      "sha256": "9f7972188801d7e1",
+      "bytes": 213006
     },
     {
       "p": "plugins/dsh-aris/cordis.patch.yml",

@@ -343,6 +343,7 @@ export function defaultPrompt(root, driver, config, settings, runId = '') {
       '   送审前自检：把该 scope 未关闭 MUST 的复现命令、diff、测试输出逐条列进包内证据（r5 是最终验收包，尤须如此）。',
       '   exit 8、gate=escalate/manual 或额度已尽 → 不送第 N+1 次，立即把 pipeline/state.json 置 blocked_on_user 并整理人工清单（bridge 已写 cap-review_*.md），等待人工裁决。',
       '7. 收尾 `gate.py … A --finish`：已送审加 `--async-wait`，无进展用 `--no-progress`。不改 Kimi automation / PIPELINE.md，不伪造结果。',
+      '8. 收尾时把本轮真正做完的子项写进 state 的 `states.<阶段>.done`（数组，元素写 {text, at, runId, verdict}），并从 `todo` 移除；done 只增不删，没做完的不要写进去。',
       '',
       '末尾只打印：RESULT: <done|idle|blocked> <一句话>',
     ].join(String.fromCharCode(10));
@@ -364,7 +365,7 @@ export function defaultPrompt(root, driver, config, settings, runId = '') {
     '最后必须打印一行：RESULT: <done|idle|blocked> <一句话>。',
   ].join('\n');
 }
-export const PROMPT_VERSION = 9;
+export const PROMPT_VERSION = 10;
 
 function promptMetaFile(root) {
   return path.join(runDir(root), 'prompt.meta.json');

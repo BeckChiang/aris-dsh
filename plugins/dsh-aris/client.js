@@ -237,6 +237,10 @@ table.daris2-tbl tbody tr.row.open td:first-child{background:var(--sel)}
 .daris2-plan-grp .daris2-sub-h{margin:0 0 4px;align-items:center}
 .daris2-plan-grp .daris2-sub-h h4{color:var(--tx)}
 .daris2-plan-grp .daris2-plantbl{margin-top:2px}
+.daris2-done-grp{margin:6px 0 2px;padding-left:10px;border-left:2px solid var(--ln)}
+.daris2-done-h{font-size:11.5px;color:var(--tx3);margin:0 0 2px}
+.daris2-donetbl td{color:var(--tx3)!important}
+.daris2-donetbl td.tx{text-decoration:none}
 .daris2-sub-h .meta{font-size:11.5px;color:var(--tx3);font-weight:400}
 .daris2-sub.open>.daris2-sub-h{border-bottom:1px solid var(--ln);border-radius:8px 8px 0 0}
 .daris2-sub-b{display:none;padding:10px 12px 12px}
@@ -2024,9 +2028,15 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
             const text = typeof item === 'string' ? item : String(item.text || '');
             return { text: text.replace(/^✅\s*/, ''), done: stage.status === 'done' || !!item.done || /^✅/.test(text) };
           });
-          return { ...stage, items };
+          const doneSource = Array.isArray(stage.doneItems) ? stage.doneItems : [];
+          const doneItems = doneSource.map((item) => {
+            if (item && typeof item === 'object') return { text: String(item.text || ''), at: item.at || '', runId: item.runId || '', verdict: item.verdict || '' };
+            return { text: String(item).replace(/^✅\s*/, ''), at: '', runId: '', verdict: '' };
+          }).filter((item) => item.text);
+          return { ...stage, items, doneItems };
         });
-        const planItemCount = treeStages.reduce((count, stage) => count + stage.items.length, 0);
+        const planItemCount = treeStages.reduce((count, stage) => count + stage.items.length + (stage.doneItems || []).length, 0);
+        const planDoneCount = treeStages.reduce((count, stage) => count + (stage.doneItems || []).length, 0);
         const activity = p.activity || null;
         const last = p.lastRun || null;
         const hist = (p.history || []).slice().reverse();
@@ -2081,19 +2091,25 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
                   (p.blockers || []).length
                     ? h('div', { className: 'daris2-note' }, (p.blockers || []).map((b, i) => h('div', { key: i }, '· [' + b.severity + '] ' + b.text)))
                     : null),
-                h(Pane, { force:mainFold, title: '计划项', meta: treeStages.length + ' 个阶段 · 共 ' + planItemCount + ' 项 · 按阶段分组', defaultOpen: true },
+                h(Pane, { force:mainFold, title: '计划项', meta: treeStages.length + ' 个阶段 · 共 ' + planItemCount + ' 项 · 已完成 ' + planDoneCount + ' 项', defaultOpen: true },
                   treeStages.length
                     ? h('div', null, treeStages.map((grp, gi) => {
                       const gDoneN = grp.items.filter((x) => x.done).length;
+                      const gDoneList = grp.doneItems || [];
                       return h('div', { key: gi, className: 'daris2-plan-grp' },
                         h('div', { className: 'daris2-sub-h' },
                           h('span', { className: 'daris2-tdot ' + (grp.status === 'done' ? 'done' : grp.status === 'in_progress' ? 'cur' : '') }),
                           h('h4', null, grp.name),
-                          h('span', { className: 'meta' }, grp.items.length ? grp.items.length + ' 项 · 完成 ' + gDoneN + '/' + grp.items.length : [({ done: '已完成', in_progress: '进行中', pending: '待开始', blocked: '受阻' })[grp.status] || grp.status, '无计划项'].filter(Boolean).join(' · ')),
+                          h('span', { className: 'meta' }, (grp.items.length ? grp.items.length + ' 项 · 完成 ' + gDoneN + '/' + grp.items.length : [({ done: '已完成', in_progress: '进行中', pending: '待开始', blocked: '受阻' })[grp.status] || grp.status, '无计划项'].filter(Boolean).join(' · ')) + (gDoneList.length ? ' · 已完成 ' + gDoneList.length + ' 项' : '')),
                           h('span', { className: 'sp' })),
                         grp.items.length > 0 && h('table', { className: 'daris2-plantbl' }, h('tbody', null, grp.items.map((it, i) => h('tr', { key: i },
                           h('td', { className: 'st' }, h('span', { className: 'daris2-tdot ' + (it.done ? 'done' : '') }), it.done ? '已完成' : '待办'),
-                          h('td', { className: 'tx', title: it.text }, (i + 1) + '. ' + cap(it.text, 90)))))));
+                          h('td', { className: 'tx', title: it.text }, (i + 1) + '. ' + cap(it.text, 90)))))),
+                          gDoneList.length ? h('div', { className: 'daris2-done-grp' },
+                            h('div', { className: 'daris2-done-h' }, '已完成 ' + gDoneList.length + ' 项'),
+                            h('table', { className: 'daris2-plantbl daris2-donetbl' }, h('tbody', null, gDoneList.map((it, i) => h('tr', { key: 'd' + i },
+                              h('td', { className: 'st' }, h('span', { className: 'daris2-tdot done' }), it.verdict || '已完成'),
+                              h('td', { className: 'tx', title: (it.text || '') + (it.at ? String.fromCharCode(10) + it.at : '') + (it.runId ? String.fromCharCode(10) + it.runId : '') }, (i + 1) + '. ' + cap(it.text, 90))))))) : null);
                     }))
                     : h('div', { className: 'daris2-empty' }, '这一阶段没有计划项')),
                 h(Pane, { force:mainFold, title: '轮次历史', meta: hist.length + ' 轮记录', defaultOpen: true },

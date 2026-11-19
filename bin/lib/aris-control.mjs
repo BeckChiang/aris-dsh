@@ -348,7 +348,13 @@ function frrsPlan(root) {
     const d = status === 'done' ? todo.length : Math.min(marked, todo.length);
     total += todo.length;
     done += d;
-    stages.push({ name, status, done: d, total: todo.length, items: todo.map((t) => ({ text: String(t), done: status === 'done' || String(t).trim().startsWith('✅') })) });
+    const doneItems = (Array.isArray(s.done) ? s.done : []).map((t) => {
+      if (t && typeof t === 'object') {
+        return { text: String(t.text || t.summary || ''), at: t.at || t.finishedAt || '', runId: t.runId || t.run || '', verdict: t.verdict || '' };
+      }
+      return { text: String(t), at: '', runId: '', verdict: '' };
+    }).filter((t) => t.text);
+    stages.push({ name, status, done: d, total: todo.length, doneItems, items: todo.map((t) => ({ text: String(t), done: status === 'done' || String(t).trim().startsWith('✅') })) });
   }
   const current = state.state || '';
   const cur = stages.find((s) => s.name === current) || null;
