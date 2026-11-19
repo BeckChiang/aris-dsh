@@ -21,11 +21,22 @@ window.__ModuleLoader__.load({
   /* 文本三级 + 横幅字色：逐条对照 mock2/mock.css 的 --tx / --tx-2 / --tx-3 与横幅色 */
   --tx:#111318;--tx2:#5a6270;--tx3:#8b929e;
   --tint-warn:#8a5206;--tint-err:#9a1c15;--tint-info:#31459b;--tint-danger:#8a2018;--tint-pre:#3f4550;
+  /* 状态徽标：--st-run/--st-warn/--st-err/--st-ok/--st-idle + 各自底色 */
+  --st-run:#2563eb;--st-run-bg:#eaf1ff;
+  --st-warn:#b45309;--st-warn-bg:#fef4e6;
+  --st-err:#c6231b;--st-err-bg:#fdeceb;
+  --st-ok:#157f3d;--st-ok-bg:#e9f7ee;
+  --st-idle:#6b7280;--st-idle-bg:#f1f2f4;
   padding:0;height:100%;min-height:0;display:flex;flex-direction:column;overflow:hidden;font-size:13px;line-height:1.55;
 }
 body[data-ds-dark-theme] .daris.daris2{
   --tx:#e6e9ef;--tx2:#9aa3b2;--tx3:#6b7482;
   --tint-warn:#e8b566;--tint-err:#ff9b90;--tint-info:#a9bcff;--tint-danger:#ff9b90;--tint-pre:#b7bdc8;
+  --st-run:#6f9dff;--st-run-bg:#16233c;
+  --st-warn:#e8a33d;--st-warn-bg:#2e2415;
+  --st-err:#ff7a6b;--st-err-bg:#331a18;
+  --st-ok:#4ec98a;--st-ok-bg:#13291e;
+  --st-idle:#8b93a1;--st-idle-bg:#1c2027;
 }
 body[data-ds-dark-theme] table.daris2-tbl th{color:var(--tx2)}
 .daris2-head{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;padding:14px 20px 12px;flex:none;border-bottom:1px solid var(--ln)}
@@ -81,11 +92,11 @@ body[data-ds-dark-theme] table.daris2-tbl th{color:var(--tx2)}
 /* 状态 */
 .daris2-badge{display:inline-flex;align-items:center;gap:5px;height:21px;padding:0 7px;border-radius:6px;font-size:11.5px;font-weight:500;white-space:nowrap;background:rgba(127,127,127,.12);color:var(--tx2)}
 .daris2-badge i{width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
-.daris2-badge.run{color:var(--dsw-alias-brand-primary,#2563eb);background:var(--a-bg)}
-.daris2-badge.review{color:var(--dsw-alias-brand-primary,#2563eb);background:var(--a-bg)}
-.daris2-badge.human,.daris2-badge.error{color:var(--dsw-alias-state-error-primary,#b42318);background:color-mix(in srgb,var(--dsw-alias-state-error-primary,#b42318) 12%,transparent)}
-.daris2-badge.stopping{color:var(--dsw-alias-state-warn-primary,#b45309);background:color-mix(in srgb,var(--dsw-alias-state-warn-primary,#b45309) 13%,transparent)}
-.daris2-badge.idle,.daris2-badge.stop{color:var(--tx2);background:rgba(127,127,127,.1)}
+.daris2-badge.run{color:var(--st-run);background:var(--st-run-bg)}
+.daris2-badge.review{color:var(--st-run);background:var(--st-run-bg)}
+.daris2-badge.human,.daris2-badge.error{color:var(--st-err);background:var(--st-err-bg)}
+.daris2-badge.stopping{color:var(--st-warn);background:var(--st-warn-bg)}
+.daris2-badge.idle,.daris2-badge.stop{color:var(--st-idle);background:var(--st-idle-bg)}
 .daris2-tag{display:inline-flex;align-items:center;height:18px;padding:0 5px;border-radius:5px;font-size:10.5px;background:rgba(127,127,127,.12);color:var(--tx2);font-variant-numeric:tabular-nums;white-space:nowrap}
 .daris2-tag.pri{background:var(--a-bg);color:var(--a)}
 .daris2-tag.ok{color:var(--dsw-alias-state-success-primary,#18794e);background:color-mix(in srgb,var(--dsw-alias-state-success-primary,#18794e) 12%,transparent)}
@@ -2228,8 +2239,8 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
                 h('div', { className: 'daris2-cell2 s' }, p.lastReview ? `${p.lastReview.verdict || ''}${p.lastReview.score != null ? ' ' + p.lastReview.score : ''}` : '未审')),
               h('td', { className: 'num' }, h('div', null, '¥' + (((p.today && p.today.cny) || 0)).toFixed(2)),
                 h('div', { className: 'daris2-cell2 s' }, `${(p.totals && p.totals.runs) || 0} 轮 · ¥${((p.totals && p.totals.cny) || 0).toFixed(2)}`)),
-              h('td', null, p.nextAt ? h('div', null, ft(p.nextAt).slice(11)) : h('span', { className: 'daris2-cell2 s' }, '未排期'),
-                h('div', { className: 'daris2-cell2 s' }, { quota: '等 GPT 额度', mailbox: '等 Kimi 回件', interval: '按间隔' }[p.nextAtBasis] || '')),
+              h('td', null, h('div', null, p.nextAt && !p.running ? ft(p.nextAt) : h('span', { className: 'daris2-cell2 s' }, p.running ? '本轮结束后' : (p.enabled ? '未排期' : '已停用'))),
+                h('div', { className: 'daris2-cell2 s' }, p.running ? '跑完按间隔' : (!p.enabled ? '' : ({ quota: '等 GPT 额度', 'quota-stuck': '等额度恢复', mailbox: '等 Kimi 回件', interval: '按间隔' }[p.nextAtBasis] || '')))),
               h('td', { onClick: (e) => e.stopPropagation() }, h('div', { style: { display: 'flex', gap: 4, alignItems: 'center' } },
                 p.running
                   ? h(Btn, { label: '停止', disabled: busy, onClick: () => act('stop', { root: p.root }) })

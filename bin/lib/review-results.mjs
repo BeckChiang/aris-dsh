@@ -90,6 +90,19 @@ function mustLines(file, max = 4) {
     .slice(0, max);
 }
 
+// 人工回复（.aris-run/human-note.md）的时间：比它更旧的「要人处理」视为已答复
+function latestHumanNoteAt(root) {
+  try {
+    const txt = fs.readFileSync(path.join(root, '.aris-run', 'human-note.md'), 'utf8');
+    const m = /^##\s*(\S+)\s*人工回复/m.exec(txt);
+    if (!m) return 0;
+    const t = Date.parse(m[1]);
+    return Number.isFinite(t) ? t : 0;
+  } catch {
+    return 0;
+  }
+}
+
 // 需要人处理的事：封顶转人工、状态机 blocked_on_user、连败停摆、退回
 function humanActionsOf(workspace, groups) {
   const out = [];
@@ -165,7 +178,16 @@ function humanActionsOf(workspace, groups) {
       out.push({ kind: 'manyrounds', level: 'warn', name: latest.name, root: latest.root, title: `${latest.scope || g.key} 已改 ${g.rounds} 轮`, detail: '同一稿子反复退回，建议人看一眼是不是方向性问题', at: latest.at, file: latest.rel });
     }
   }
-  return out;
+  // 已经人工回复过的提示不再挂着：回复时间晚于这条事的时间，就当作答复完毕。
+  const noteAt = new Map();
+  return out.filter((a) => {
+    if (!a.root || !a.at) return true;
+    if (!noteAt.has(a.root)) noteAt.set(a.root, latestHumanNoteAt(a.root));
+    const note = noteAt.get(a.root) || 0;
+    if (!note) return true;
+    const at = Date.parse(a.at);
+    return !(Number.isFinite(at) && at <= note);
+  });
 }
 
 /** 汇总全部流水线的审稿结果，按时间倒序。 */
