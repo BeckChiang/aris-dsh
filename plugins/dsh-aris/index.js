@@ -17,6 +17,8 @@ let libPromise = null;
 const lib = () => {
   if (!libPromise) {
     const rev = `${REV.at}`;
+    // 让 bin/lib/* 里对同族模块的再导入也能拿到本次重载的版本串（否则 ESM 缓存会锁死在启动时那份）。
+    try { process.env.ARIS_LIB_REV = rev; } catch { /* 只读环境忽略 */ }
     libPromise = Promise.all([
       import(`../../bin/lib/aris-control.mjs?rev=${rev}`),
       import(`../../bin/lib/aris-events.mjs?rev=${rev}`),

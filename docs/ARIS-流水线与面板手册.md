@@ -684,6 +684,8 @@ GPT 通道（`via: codex`）的数据流：
 - **续聊是另一条路**：`codex resume` 不受面板闸门与审计约束，只受订阅额度约束；要审稿还是走派单
 - **面板改了线路、流水线却还送 Kimi**：先看线路卡下方项目的 `active` 是否跟上；没跟上就再点一次线路按钮保存（会同步 `reviewer.json`）。仍然不对，查 `pipeline/review/mailbox_bridge.py` 读到的 `external.review.channel` 与项目 `active` 是否一致
 - **GPT 送审失败后邮箱没有请求**：这是设计如此——GPT 通道失败直接退出、不降级，修好额度/线路后重跑同一命令即可
+- **调度器（`aris-runner.mjs`）特别说明**：2026-11-19 起它的 import 版本串跟随插件重载（`ARIS_LIB_REV`，由 `plugins/dsh-aris/index.js` 在每次 `lib()` 时写入），不再需要手动升 `?v=N`；其它 `lib/*.mjs` 仍要升版本号。
+- **改完调度器代码后**：`plugin_manager set_plugin include:aris` 关→开即可生效，不必重启 DSH；若快照的 `runnerRev` 没变，说明重载没走到。
 - **改了 `bin/lib/*.mjs` 面板行为没变**：插件宿主按 URL 缓存模块，`lib` 之间互相 `import` 也要带版本号（如 `from './review-route.mjs?v=3'`），改完必须升版本再 `plugin_manager set_plugin include:aris` 关掉再开；只重启插件不升版本会继续跑旧代码（踩过：`readProjectSlots is not defined`）
 - **线路卡上的项目标签是琥珀色**：说明该项目 `reviewer.json` 的 `active` 还没跟上面板；点一次线路按钮即可同步（保存会逐个项目写入并回读）
 

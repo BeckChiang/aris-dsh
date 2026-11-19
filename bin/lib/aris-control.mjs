@@ -25,7 +25,9 @@ import {
   upsertProject,
   writeJsonAtomic,
 } from './aris-registry.mjs?v=46';
-import { costView, effectiveInterval, isRunning, kimiIntervalMinutes, nextKimiTick, nextRunAt, pendingReviews, pendingSubmittedAt, preflight, recoverStale, resetPrompt, runOnce, cancelStopIntent, stopPipeline, tick, todayStats, RUNNER_REV } from './aris-runner.mjs?v=48';
+// 调度器改得最勤：版本串跟随插件重载（ARIS_LIB_REV），避免 ESM 缓存把 tick 锁在上一次启动的代码。
+const ARIS_LIB_REV = process.env.ARIS_LIB_REV || '49';
+const { costView, effectiveInterval, isRunning, kimiIntervalMinutes, nextKimiTick, nextRunAt, pendingReviews, pendingSubmittedAt, preflight, recoverStale, resetPrompt, runOnce, cancelStopIntent, stopPipeline, tick, todayStats, RUNNER_REV } = await import(`./aris-runner.mjs?v=${ARIS_LIB_REV}`);
 import { resolveDsh } from './aris-dsh.mjs?v=46';
 import { CODEX_TASKS, codexState, listModels, normalizeWorkspace, previewPrompt, readCodexConfig, runCodexReview, saveCodexConfig, quotaGate } from './codex-review.mjs?v=7';
 import { readProjectSlots, readReviewRoute, routeBlocks, saveReviewRoute } from './review-route.mjs?v=3';
@@ -1454,7 +1456,7 @@ ${text}
       return { ok: true, output: String(out).trim().slice(-1000) };
     }
     case 'mailbox.collect': {
-      const { collectMailbox } = await import('./aris-runner.mjs');
+      const { collectMailbox } = await import(`./aris-runner.mjs?v=${ARIS_LIB_REV}`);
       const out = await collectMailbox(workspace, settings, runDir(workspace));
       return { ok: true, collect: out };
     }
