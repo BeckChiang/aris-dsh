@@ -1792,7 +1792,7 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
             setToast(r && r.stopped ? '已停止' : '已登记停止：本轮跑完即停');
           } else if (r && r.ok === false) {
             setToast(String(r.error || (ACT_LABEL[name] || name) + '失败'));
-          } else {
+          } else if (name !== 'human.reply') {
             setToast(String((r && r.message) || ((ACT_LABEL[name] || name) + ' 完成')));
           }
           return r;
