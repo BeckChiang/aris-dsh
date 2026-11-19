@@ -142,7 +142,7 @@ function humanActionsOf(workspace, groups) {
         level: 'bad',
         name,
         root,
-        title: `审查封顶转人工 · ${st.block.scope || '?'}`,
+        title: `审查封顶转人工 · ${st.block.scope || st.block.id || (String(st.block.reason || '').slice(0, 24)) || '未注明'}`,
         detail: String(st.block.reason || '').replace(/\s+/g, ' ').slice(0, 240),
         at: st.block.at || st.block.created_at || '',
         file: checklist,

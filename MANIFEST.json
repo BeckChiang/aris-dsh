@@ -1,11 +1,11 @@
 {
   "repo": "BeckChiang/aris-dsh",
-  "generated_at": "2026-11-19T12:57:05.657Z",
+  "generated_at": "2026-11-19T12:57:52.018Z",
   "note": "由 scripts/sync.mjs 从本机 DSH 工作区单向生成；本文件为发布快照标识，请勿手改。",
   "rules_version": 1,
   "counts": {
     "files": 681,
-    "bytes": 13160563
+    "bytes": 13160634
   },
   "excluded": [
     "tests",
@@ -3304,8 +3304,8 @@
     },
     {
       "p": "bin/lib/review-results.mjs",
-      "sha256": "c582c27fc1e67670",
-      "bytes": 14737
+      "sha256": "f7d9ddd4d37c744d",
+      "bytes": 14808
     },
     {
       "p": "bin/lib/review-route.mjs",
