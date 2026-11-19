@@ -1,6 +1,6 @@
 {
   "repo": "BeckChiang/aris-dsh",
-  "generated_at": "2026-11-19T14:27:16.501Z",
+  "generated_at": "2026-11-19T14:33:00.077Z",
   "note": "由 scripts/sync.mjs 从本机 DSH 工作区单向生成；本文件为发布快照标识，请勿手改。",
   "rules_version": 1,
   "counts": {
@@ -3279,7 +3279,7 @@
     },
     {
       "p": "bin/lib/aris-runner.mjs",
-      "sha256": "25807c62af32b33e",
+      "sha256": "41e1dd44fa0da460",
       "bytes": 60971
     },
     {
