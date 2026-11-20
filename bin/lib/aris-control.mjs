@@ -354,7 +354,10 @@ function frrsPlan(root) {
       }
       return { text: String(t), at: '', runId: '', verdict: '' };
     }).filter((t) => t.text);
-    stages.push({ name, status, done: d, total: todo.length, doneItems, items: todo.map((t) => ({ text: String(t), done: status === 'done' || String(t).trim().startsWith('✅') })) });
+    // done[] 只保留最近若干条，更早的进 pipeline/done-archive.json；doneArchived 记账，
+    // 面板上的「已完成 k 项」仍按总数算，明细只列留下的那些。
+    const doneArchived = Number(s.doneArchived || 0) || 0;
+    stages.push({ name, status, done: d, total: todo.length, doneItems, doneArchived, doneTotal: doneItems.length + doneArchived, items: todo.map((t) => ({ text: String(t), done: status === 'done' || String(t).trim().startsWith('✅') })) });
   }
   const current = state.state || '';
   const cur = stages.find((s) => s.name === current) || null;

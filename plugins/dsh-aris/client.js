@@ -1714,11 +1714,13 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
           progress = completed + '/' + children.length + ' 个子阶段';
         }
         const doneItems = stage ? (stage.doneItems || []) : [];
+        const doneArchived = stage ? Number(stage.doneArchived || 0) : 0;
+        const doneTotal = doneItems.length + doneArchived;
         const expandable = Boolean(items.length || children.length || doneItems.length);
         const row = h(expandable ? 'summary' : 'div', { className: 'daris2-trow' },
           h('span', { className: 'daris2-tdot ' + (colors[status] || '') }),
           h('b', { title: name }, name),
-          h('span', { className: 'tmeta' }, [labels[status] || status || '状态未知', progress, doneItems.length ? '已记 ' + doneItems.length + ' 项' : ''].filter(Boolean).join(' ')));
+          h('span', { className: 'tmeta' }, [labels[status] || status || '状态未知', progress, doneTotal ? '已记 ' + doneTotal + ' 项' : ''].filter(Boolean).join(' ')));
         return h('li', { key: name }, expandable
           ? h('details', { open: force ? force.open : children.length > 0 || status === 'in_progress' }, row,
             h('ul', null, items.slice(0, 6).map((item, index) => h('li', { key: index, className: 'daris2-tree-item' },
@@ -2043,10 +2045,11 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
             if (item && typeof item === 'object') return { text: String(item.text || ''), at: item.at || '', runId: item.runId || '', verdict: item.verdict || '' };
             return { text: String(item).replace(/^✅\s*/, ''), at: '', runId: '', verdict: '' };
           }).filter((item) => item.text);
-          return { ...stage, items, doneItems };
+          const doneArchived = Number(stage.doneArchived || 0) || 0;
+          return { ...stage, items, doneItems, doneArchived, doneTotal: doneItems.length + doneArchived };
         });
-        const planItemCount = treeStages.reduce((count, stage) => count + stage.items.length + (stage.doneItems || []).length, 0);
-        const planDoneCount = treeStages.reduce((count, stage) => count + (stage.doneItems || []).length, 0);
+        const planItemCount = treeStages.reduce((count, stage) => count + stage.items.length + (stage.doneTotal || (stage.doneItems || []).length), 0);
+        const planDoneCount = treeStages.reduce((count, stage) => count + (stage.doneTotal || (stage.doneItems || []).length), 0);
         const activity = p.activity || null;
         const last = p.lastRun || null;
         const hist = (p.history || []).slice().reverse();
@@ -2110,13 +2113,13 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
                         h('div', { className: 'daris2-sub-h' },
                           h('span', { className: 'daris2-tdot ' + (grp.status === 'done' ? 'done' : grp.status === 'in_progress' ? 'cur' : '') }),
                           h('h4', null, grp.name),
-                          h('span', { className: 'meta' }, (grp.items.length ? grp.items.length + ' 项 · 完成 ' + gDoneN + '/' + grp.items.length : [({ done: '已完成', in_progress: '进行中', pending: '待开始', blocked: '受阻' })[grp.status] || grp.status, '无计划项'].filter(Boolean).join(' · ')) + (gDoneList.length ? ' · 已完成 ' + gDoneList.length + ' 项' : '')),
+                          h('span', { className: 'meta' }, (grp.items.length ? grp.items.length + ' 项 · 完成 ' + gDoneN + '/' + grp.items.length : [({ done: '已完成', in_progress: '进行中', pending: '待开始', blocked: '受阻' })[grp.status] || grp.status, '无计划项'].filter(Boolean).join(' · ')) + ((grp.doneTotal || gDoneList.length) ? ' · 已完成 ' + (grp.doneTotal || gDoneList.length) + ' 项' + (grp.doneArchived ? '（归档 ' + grp.doneArchived + '）' : '') : '')),
                           h('span', { className: 'sp' })),
                         grp.items.length > 0 && h('table', { className: 'daris2-plantbl' }, h('tbody', null, grp.items.map((it, i) => h('tr', { key: i },
                           h('td', { className: 'st' }, h('span', { className: 'daris2-tdot ' + (it.done ? 'done' : '') }), it.done ? '已完成' : '待办'),
                           h('td', { className: 'tx', title: it.text }, (i + 1) + '. ' + cap(it.text, 90)))))),
                           gDoneList.length ? h('div', { className: 'daris2-done-grp' },
-                            h('div', { className: 'daris2-done-h' }, '已完成 ' + gDoneList.length + ' 项'),
+                            h('div', { className: 'daris2-done-h' }, '已完成 ' + (grp.doneTotal || gDoneList.length) + ' 项' + (grp.doneArchived ? '（这里只列最近 ' + gDoneList.length + ' 条，更早的 ' + grp.doneArchived + ' 条在 pipeline/done-archive.json）' : '')),
                             h('table', { className: 'daris2-plantbl daris2-donetbl' }, h('tbody', null, gDoneList.map((it, i) => h('tr', { key: 'd' + i },
                               h('td', { className: 'st' }, h('span', { className: 'daris2-tdot done' }), it.verdict || '已完成'),
                               h('td', { className: 'tx', title: (it.text || '') + (it.at ? String.fromCharCode(10) + it.at : '') + (it.runId ? String.fromCharCode(10) + it.runId : '') }, (i + 1) + '. ' + cap(it.text, 90))))))) : null);
