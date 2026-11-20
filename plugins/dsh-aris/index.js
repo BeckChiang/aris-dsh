@@ -61,11 +61,12 @@ const ACTIONS = new Set([
   'refresh', 'add', 'remove', 'start', 'stop', 'run', 'tick', 'resume', 'logs',
   'prompt.get', 'prompt.set', 'prompt.reset', 'settings.save', 'task.delete',
   'handoff.set', 'mailbox.collect', 'workspace.register', 'workspace.list', 'workspace.unregister',
-  'kimi.prompt', 'limits.save', 'human.reply', 'recover', 'lease.release', 'balance.check',
+  'kimi.prompt', 'limits.save', 'human.reply', 'quota.raise', 'recover', 'lease.release', 'balance.check',
   'sessions.name', 'sessions.retitle', 'runtime.reset',
   'paper.build',
   'guard.test',
-  'codex.state', 'codex.save', 'codex.run', 'codex.models', 'codex.session', 'review.route',
+  'codex.state', 'codex.save', 'codex.run', 'codex.models', 'codex.session', 'review.route', 'project.roles',
+  'pipeline.settings.save',
 ]);
 
 function json(res, status, value) {
@@ -270,11 +271,11 @@ export function apply(ctx, config = {}) {
     if ((req.method || 'GET').toUpperCase() !== 'GET') return json(res, 405, { ok: false, error: '只接受 GET' });
     try {
       const { snapshot, getBalance } = await lib();
-      const snap0 = snapshot(workspace, config);
-      await getBalance(workspace, snap0.settings);
+      const dashboard = snapshot(workspace, config);
+      const balance = await getBalance(workspace, dashboard.settings);
       // quitGuard 只作诊断：面板不认这个字段，问「退出为什么不提示」时一眼能看。
       json(res, 200, {
-        ...snapshot(workspace, config),
+        ...dashboard, balance,
         quitGuard: { available: Boolean(jobsService), controller: Boolean(detachGuard), active: runGuards.size, listed: (() => { try { return jobsService.list().filter(isGuardJob).length; } catch { return -1; } })(), error: guardError },
       });
     } catch (error) {
@@ -413,7 +414,7 @@ export function apply(ctx, config = {}) {
           dashboard: snapshot(workspace, config),
         });
       }
-      if (action === 'run') input.hooks = guardHooks;
+      if (action === 'run' || (action === 'human.reply' && input.restart)) input.hooks = guardHooks;
       const result = await control(workspace, action, input, config);
       json(res, 200, { ...result, dashboard: snapshot(workspace, config) });
     } catch (error) {
@@ -819,8 +820,7 @@ export function apply(ctx, config = {}) {
       } catch (error) {
         logger?.warn?.('dsh-aris: title sessions failed', error);
       }
-      if (snap.handoff.mode !== 'dsh') return;
-      if (!snap.pipelines.some((p) => p.enabled)) return;
+      if (!snap.pipelines.some((p) => p.enabled && p.mode === 'dsh')) return;
       const result = await control(workspace, 'tick', { hooks: guardHooks }, config);
       const started = (result.results || []).filter((r) => r && r.started);
       if (started.length) logger?.info?.(`dsh-aris: ticker started ${started.length} pipeline(s)`);

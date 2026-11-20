@@ -1,5 +1,5 @@
 /** 运行时版本标记：面板会回显它，用来确认插件宿主加载的是不是最新模块（改完必须升这里 + aris-control 的 ?v=）。 */
-export const RUNNER_REV = 51;
+export const RUNNER_REV = 54;
 // 流水线运行器：为每条流水线起一次 dsh headless，记账、落日志、排下一次。
 //
 // 设计要点：
@@ -26,6 +26,9 @@ import {
 import { buildEnv, isPidAlive, killTree, resolveDsh, resolveNode, spawnHeadless, writeModelPatch } from './aris-dsh.mjs?v=46';
 import { addUsage, normalizeUsage, priceUsage, rateFor, summarizeRuns, usageFromEvent, ZERO_USAGE } from './aris-cost.mjs?v=46';
 import { appendEvent } from './aris-events.mjs?v=46';
+import { chooseRoundTask } from './aris-round-task.mjs?v=1';
+import { reviewQuotaTasks, rememberReviewQuota } from './codex-review.mjs?v=10';
+import { effectiveReviewer } from './review-route.mjs?v=5';
 import { maybeArchiveDone } from './aris-done-archive.mjs';
 import { buildPlanIndex, renderSnapshot, writePlanIndex } from './aris-plan-index.mjs';
 import { execFileSync } from 'node:child_process';
@@ -46,12 +49,38 @@ export function kimiIntervalMinutes(settings = {}) {
   return n > 0 ? n : 15;
 }
 
-/** 实际起轮间隔：DSH 跑时是 Kimi 周期的 2 倍（取件快于生成），交回 Kimi 时同频。 */
+const DSH_MIN_INTERVAL_MINUTES = 5;
+
+/** DSH 自己的最小起轮间隔（分钟）：项目配置 > 全局设置 > 5 分钟。 */
+export function dshIntervalMinutes(config = {}, settings = {}) {
+  const own = Number(config && config.minIntervalMinutes);
+  if (own > 0) return own;
+  const all = Number(settings && settings.dsh && settings.dsh.minIntervalMinutes);
+  if (all > 0) return all;
+  return DSH_MIN_INTERVAL_MINUTES;
+}
+
+/**
+ * DSH 收尾后到下一轮的真实等待（分钟）。
+ * 邮箱审稿：下一轮若早于取件就会空转一轮，所以等 2×取件周期；GPT 外审：用面板设置的最小间隔。
+ */
+export function reviewGapMinutes(workspace, root, config = {}, settings = {}) {
+  let route = 'auto';
+  try {
+    route = effectiveReviewer(workspace, root);
+  } catch {
+    route = 'auto';
+  }
+  if (route === 'kimi') return kimiIntervalMinutes(settings) * 2;
+  return dshIntervalMinutes(config, settings);
+}
+
+/** 实际起轮间隔：Kimi 同频；DSH 用最小间隔（默认 5 分钟），避免收尾即起、额度被连烧。 */
 export function effectiveInterval(config = {}, settings = {}, mode = 'dsh') {
   const manual = Number(config.intervalMinutes) || 0;
   if (config.intervalSource === 'manual' && manual > 0) return manual;
   const base = kimiIntervalMinutes(settings);
-  return mode === 'kimi' ? base : base * 2;
+  return mode === 'kimi' ? base : dshIntervalMinutes(config, settings);
 }
 
 /** Kimi 取件的下一个格点：startTime + n·K；没设 startTime 就按“从现在起一个周期”。 */
@@ -74,7 +103,7 @@ export function nextKimiTick(settings = {}, fromMs = Date.now()) {
  *  - 有在途审稿：等下一次 Kimi 取件 + 审稿窗口，拿到完整返回再跑；
  *  - 没有在途审稿：立刻跑（20 分钟冷却只是给 Kimi 乒乓模式用的）。
  */
-export function nextRunAt(settings = {}, mode = 'dsh', fromMs = Date.now(), { pending = false, submittedAt = 0, blockedUntil = 0 } = {}) {
+export function nextRunAt(settings = {}, mode = 'dsh', fromMs = Date.now(), { pending = false, submittedAt = 0, blockedUntil = 0, dshMinutes = 0 } = {}) {
   const base = kimiIntervalMinutes(settings);
   const review = Math.max(5, Number((settings.kimi && settings.kimi.reviewMinutes) || 15));
   if (pending) {
@@ -88,7 +117,8 @@ export function nextRunAt(settings = {}, mode = 'dsh', fromMs = Date.now(), { pe
   // GPT 侧额度用完时，下一轮也不能早于「额度恢复」那个时刻。
   if (blockedUntil && Number(blockedUntil) > fromMs) return new Date(Number(blockedUntil)).toISOString();
   if (mode === 'kimi') return new Date(fromMs + base * 60_000).toISOString();
-  return new Date(fromMs).toISOString();
+  const gap = Number(dshMinutes) > 0 ? Number(dshMinutes) : DSH_MIN_INTERVAL_MINUTES;
+  return new Date(fromMs + gap * 60_000).toISOString();
 }
 
 /** 邮箱里还在等回复的请求（按 target/state_dir 认领到具体流水线）。 */
@@ -106,12 +136,13 @@ export function pendingReviews(settings = {}, root = '') {
   const norm = (v) => String(v || '').split('\\').join('/').replace(/\/+$/, '').toLowerCase();
   const lower = norm(root);
   const out = [];
+  const belongsToRoot = candidate => !lower || candidate === lower || candidate.startsWith(lower + '/');
   for (const [base, entry] of Object.entries(projects)) {
     if (!entry) continue;
     if (!fs.existsSync(path.join(mailbox, 'in', `${base}.request.md`))) continue;
     const target = norm(entry.target_abs || entry.target);
     const sd = norm(entry.state_dir || entry.project);
-    const mine = (target && target.startsWith(lower)) || (sd && sd.startsWith(lower));
+    const mine = (target && belongsToRoot(target)) || (sd && belongsToRoot(sd));
     if (mine) out.push({ base, target: entry.target_abs || entry.target || '', created_at: entry.created_at });
   }
   return out;
@@ -163,6 +194,11 @@ export function todayStats(root) {
   return { runs, cny: Math.round(cny * 1e6) / 1e6, day: key };
 }
 
+export function executorMode(workspace, config) {
+  if (config.executor === 'kimi' || config.executor === 'dsh') return config.executor;
+  return handoffMode(workspace);
+}
+
 function handoffMode(workspace) {
   try {
     const j = JSON.parse(fs.readFileSync(path.join(workspace, '.dsh', 'aris-handoff.json'), 'utf8'));
@@ -179,10 +215,17 @@ function stamp(date = new Date()) {
 
 /**
  * 空闲窗口里的维护：done 归档 + 刷新计划索引。
- * 两者都只读 state.json、只写各自的辅助文件，失败一律静默，绝不拦调度。
+ * 归档会回写状态；人工裁决、在途租约及 Kimi 执行期间跳过维护。
  */
 function idleMaintenance(workspace, entry) {
   try {
+    const cfg = readConfig(entry.root);
+    if (executorMode(workspace, cfg) !== 'dsh' || isRunning(entry.root)) return;
+    const stateFile = path.join(entry.root, cfg.frrs.state);
+    if (fs.existsSync(stateFile)) {
+      const state = readJsonFull(stateFile);
+      if (state.block || ['blocked_on_user', 'paused'].includes(state.status) || state.chain?.wake_start || state.chain?.relay_to) return;
+    }
     const text = (msg) => appendEvent(workspace, { name: entry.name || path.basename(entry.root), text: msg });
     maybeArchiveDone(entry.root, { workspace, name: entry.name, event: text });
     writePlanIndex(entry.root, { driver: entry.driver || 'frrs' });
@@ -240,6 +283,7 @@ export function releaseLeaseIfHeld(root, config = {}, { startedAt = 0, pending =
   if (!chain.wake_owner || !startedMs) return null;
   if (Number(startedAt) && startedMs < Number(startedAt) - 120_000) return null;
   const half = config.frrs?.half || 'A';
+  if (chain.wake_owner !== half) return null;
   const args = ['pipeline/gate.py', 'pipeline/state.json', half, '--finish'];
   if (pending > 0) args.push('--async-wait');
   try {
@@ -262,7 +306,7 @@ function readJsonFull(file) {
 }
 
 /** 唤醒时的门禁：只读，不改任何状态。返回 {ok, reason}。 */
-export function preflight(root, config = readConfig(root), settings = {}, mode = 'dsh') {
+export function preflight(root, config = readConfig(root), settings = {}, mode = 'dsh', { approved = false } = {}) {
   // 本轮就在跑（租约是我们自己持的），不是“被别的执行者挡住”。
   if (isRunning(root)) {
     return { ok: false, reason: '本轮进行中', driver: config.driver, silent: true, retryAfterMs: 60_000 };
@@ -295,14 +339,14 @@ export function preflight(root, config = readConfig(root), settings = {}, mode =
       };
     }
     const status = String((st && st.status) || '');
-    if (status === 'paused') return { ok: false, reason: '流水线处于 paused', driver, retryAfterMs: 5 * 60_000 };
-    if (status === 'blocked_on_user') return { ok: false, reason: '等待人工处理（blocked_on_user）', driver, retryAfterMs: 10 * 60_000 };
+    if (!approved && status === 'paused') return { ok: false, reason: '流水线处于 paused', driver, retryAfterMs: 5 * 60_000 };
+    if (!approved && status === 'blocked_on_user') return { ok: false, reason: '等待人工处理（blocked_on_user）', driver, retryAfterMs: 10 * 60_000 };
     if (String(st.state || '') === 'done') return { ok: false, reason: '流水线已到 done', driver };
     const chain = st.chain || {};
     const owner = String(chain.wake_owner || '');
     const wakeStart = Date.parse(chain.wake_start || '');
     const leaseMs = 70 * 60_000;
-    if (owner && Number.isFinite(wakeStart) && Date.now() - wakeStart < leaseMs) {
+    if (Number.isFinite(wakeStart) && Date.now() - wakeStart < leaseMs) {
       const mins = Math.round((Date.now() - wakeStart) / 60_000);
       return { ok: false, reason: `另一方持有租约（${owner}，${mins} 分钟）`, driver, retryAfterMs: 60_000 };
     }
@@ -344,12 +388,21 @@ export function preflight(root, config = readConfig(root), settings = {}, mode =
   return { ok: true, driver, mode, pending: 0 };
 }
 /** 人工在面板里写的裁决/补充说明，逐轮追加到提示词末尾，模型每轮都能看到最新一条。 */
+function latestHumanNote(root) {
+  // human.reply 会把最新一条插在文件开头：只取第一块，历史回复已归档到 state.user_directives。
+  const raw = readText(path.join(runDir(root), 'human-note.md')) || '';
+  if (!raw.trim()) return '';
+  const blocks = raw.split(/^(?=## )/m).filter((part) => /^## /.test(part));
+  const latest = (blocks[0] || raw).replace(/^##[^\n]*\n+/, '').trim();
+  return latest.slice(0, 1500);
+}
+
 function withHumanNote(root, text) {
-  const note = readText(path.join(runDir(root), 'human-note.md')).slice(-4000).trim();
+  const note = latestHumanNote(root);
   if (!note) return text;
   return `${text}
 
-===== 人工回复（面板提交，按最新在前）=====
+===== 人工回复（只取最新一条；更早的已归档）=====
 ${note}
 `;
 }
@@ -377,7 +430,7 @@ export function defaultPrompt(root, driver, config, settings, runId = '') {
       '6. 完整做完一个子项且全绿才送审（每轮≤1 次）：dataset_gen 下拼 review_package_<scope>_r<轮>.md（首行 <!-- focused: true; scope: <scope>; round: <n> -->，含改动、证据、单测尾部，≤30000 字节），再',
       '   PYTHONIOENCODING=utf-8 python pipeline/review/mailbox_bridge.py --state-dir .aris --mailbox {{MAILBOX}} send --package <包> --tier review --out <out 路径> --scope <scope> --round <n>',
       '   全局参数（--state-dir/--mailbox）必须放在 send 之前；exit 0 且邮箱 queue.md 出现该请求才算入队；非 0 不绕过，写进 runs 日志；没送审则记「送审跳过：<缺什么>」。',
-      `   **送审前必须先查额度**：跑 \`node ${QUOTA_CLI}\`，输出一行 JSON；\`blocked=true\` 时不要调用 mailbox_bridge（别浪费物理送审次数、别写 attempts），把本轮记成「送审跳过：等额度，<freeAt> 之后恢复」，继续下一个原子块或正常收尾。`,
+      `   **送审前必须先查额度**：跑 \`node ${QUOTA_CLI} --target <待送审包>\`，输出一行 JSON；\`blocked=true\` 时不要调用 mailbox_bridge（别浪费物理送审次数、别写 attempts），把本轮记成「送审跳过：等额度，<freeAt> 之后恢复」，继续下一个原子块或正常收尾。`,
       '   送审前自检：把该 scope 未关闭 MUST 的复现命令、diff、测试输出逐条列进包内证据（r5 是最终验收包，尤须如此）。',
       '   exit 8、gate=escalate/manual 或额度已尽 → 不送第 N+1 次，立即把 pipeline/state.json 置 blocked_on_user 并整理人工清单（bridge 已写 cap-review_*.md），等待人工裁决。',
       '7. 收尾 `gate.py … A --finish`：已送审加 `--async-wait`，无进展用 `--no-progress`。不改 Kimi automation / PIPELINE.md，不伪造结果。',
@@ -405,7 +458,7 @@ export function defaultPrompt(root, driver, config, settings, runId = '') {
     '最后必须打印一行：RESULT: <done|idle|blocked> <一句话>。',
   ].join('\n');
 }
-export const PROMPT_VERSION = 11;
+export const PROMPT_VERSION = 12;
 
 function promptMetaFile(root) {
   return path.join(runDir(root), 'prompt.meta.json');
@@ -602,12 +655,17 @@ export async function runOnce(options = {}) {
   const root = path.resolve(options.root || '');
   const settings = options.settings || readSettings(workspace);
   const config = options.config || readConfig(root);
+  if (executorMode(workspace, config) === 'kimi') {
+    return { ok: false, summary: '执行权在 Kimi A/B，DSH 未启动轮次' };
+  }
   const key = root.toLowerCase();
   // 宿主插件用它把「有一轮在跑」登记成后台 job，退出确认才拦得住直接关进程。
   const hooks = options.hooks && typeof options.hooks === 'object' ? options.hooks : null;
 
-  if (RUNNING.has(key)) return { ok: false, exit: null, runId: '', usage: { ...ZERO_USAGE }, cny: null, summary: '同一条流水线已有运行中的回合' };
+  if (isRunning(root)) return { ok: false, exit: null, runId: '', usage: { ...ZERO_USAGE }, cny: null, summary: '同一条流水线已有运行中的回合' };
 
+  const selection = chooseRoundTask(workspace, root, config);
+  if (!selection.ok) return { ok: false, runId: '', summary: selection.reason, blockedTasks: selection.blocked };
   const driverInfo = detectDriver(root);
   const driver = config.driver && config.driver !== 'auto' ? config.driver : driverInfo.driver;
   const runId = `${stamp()}-${Math.random().toString(36).slice(2, 6)}`;
@@ -653,9 +711,9 @@ export async function runOnce(options = {}) {
   const staleStop = readStopRequest(root);
   if (staleStop && Number(staleStop.at) < startedAt) clearStopRequest(root);
   const eventsPath = path.join(dir, 'events.ndjson');
-  const events = fs.createWriteStream(eventsPath, { flags: 'a' });
+  let events;
   const errPath = path.join(dir, 'stderr.log');
-  const errStream = fs.createWriteStream(errPath, { flags: 'a' });
+  let errStream;
 
   let usage = { ...ZERO_USAGE };
   let steps = 0;
@@ -663,17 +721,23 @@ export async function runOnce(options = {}) {
   let sawTurnEnd = false;
 
   const collect = await collectMailbox(workspace, settings, dir, root);
-  if (collect) {
-    events.write(`${JSON.stringify({ type: 'collect', code: collect.code })}\n`);
-  }
-
   const runHead =
     `运行编号：${runId}（环境变量 ARIS_RUN_ID 同值；写本轮日志时文件名请用 runs/${runId}-dsh.md，不要自己拼时间戳）\n\n`;
   const resolved = ensurePrompt(root, driver, config, settings, runId);
   const staleNote = resolved.stale
     ? (String.fromCharCode(10) + String.fromCharCode(10) + '[提示] prompt.md 是手改过的旧版本，可能缺少送审步骤；可在面板点「重置提示词」。' + String.fromCharCode(10))
     : '';
-  const prompt = runHead + fillPrompt(resolved.text, root, settings, runId) + staleNote;
+  const deferred = reviewQuotaTasks(workspace, root);
+  const reviewNote = [
+    ...(driver === 'frrs' ? ['GPT 额度只在实际送审时检查。额度不足时保留送审包和命令，暂跳过该送审项，继续计划中不依赖该回件的本地任务；不要将项目置为 blocked_on_user，也不要消耗物理送审次数。'] : []),
+    ...(selection.task ? ['本轮唯一已获准的任务：' + selection.task + '。如果它不是阶段首项，保持被跳过的待办原样。'] : []),
+    ...selection.blocked.slice(0, 6).map(item => '本轮跳过：' + item.task + ' · ' + item.reason),
+    ...(selection.blocked.length > 6 ? [`本轮另有 ${selection.blocked.length - 6} 项被跳过，原因同上，完整清单见面板。`] : []),
+    ...deferred.slice(0, 4).map(item => `- ${item.task}（${item.target}）：${item.blocked ? ('等额度 ' + (item.freeAt || item.reason)) : '额度可用，按原流程送审'}`),
+    ...(deferred.length > 4 ? [`- 另有 ${deferred.length - 4} 项待送审额度记录，见面板。`] : []),
+    driver === 'frrs' && deferred.some(item => item.blocked) ? '如果当前没有可做的本地任务，正常收尾并注明送审跳过：等额度。' : '',
+  ].filter(Boolean).join('\n');
+  const prompt = withHumanNote(root, runHead + fillPrompt(resolved.text, root, settings, runId) + staleNote + (reviewNote ? '\n\n' + reviewNote : ''));
   fs.writeFileSync(path.join(dir, 'prompt.md'), prompt, 'utf8');
 
   const model = config.model || settings.model || '';
@@ -699,6 +763,11 @@ export async function runOnce(options = {}) {
   let sessionId = '';
 
   try {
+    events = fs.createWriteStream(eventsPath, { fd: fs.openSync(eventsPath, 'a') });
+    errStream = fs.createWriteStream(errPath, { fd: fs.openSync(errPath, 'a') });
+    if (collect) {
+      events.write(`${JSON.stringify({ type: 'collect', code: collect.code })}\n`);
+    }
     const { child, done } = spawnHeadless({
       dsh,
       nodePath,
@@ -741,6 +810,7 @@ export async function runOnce(options = {}) {
       },
     });
     saveRuntime(root, { pid: child.pid || null });
+    if (child.pid) options.onSpawn?.({ runId, pid: child.pid });
     RUNNING.set(key, { runId, child });
     const result = await done;
     exit = result.code;
@@ -750,8 +820,8 @@ export async function runOnce(options = {}) {
     errorText = String(error);
   } finally {
     RUNNING.delete(key);
-    events.end();
-    errStream.end();
+    events?.end();
+    errStream?.end();
   }
 
   const finishedAt = new Date();
@@ -802,7 +872,7 @@ export async function runOnce(options = {}) {
     usage: addUsage(normalizeUsage(prev.totals?.usage), usage),
     cny: Math.round(((prev.totals?.cny || 0) + (cny ? cny.total : 0)) * 1e6) / 1e6,
   };
-  const modeNow = options.mode || handoffMode(workspace);
+  const modeNow = executorMode(workspace, config);
   const pendingList = pendingReviews(settings, root);
   // 下一轮时间有三条支路：等 Kimi 取件 / 等 GPT 额度恢复 / 按节拍。面板按 nextAtBasis 显示在等谁。
   let nextAt = null;
@@ -812,14 +882,8 @@ export async function runOnce(options = {}) {
       nextAt = nextRunAt(settings, modeNow, Date.now(), { pending: true, submittedAt: pendingSubmittedAt(pendingList) });
       nextAtBasis = 'mailbox';
     } else {
-      const gate = await gptQuotaGate(workspace);
-      if (gate && gate.blocked && gate.freeAt) {
-        nextAt = new Date(Math.max(Date.parse(gate.freeAt) || 0, Date.now())).toISOString();
-        nextAtBasis = 'quota';
-      } else {
-        nextAt = nextRunAt(settings, modeNow, Date.now(), { pending: false });
-        nextAtBasis = gate && gate.blocked ? 'quota-stuck' : 'interval';
-      }
+      nextAt = nextRunAt(settings, modeNow, Date.now(), { dshMinutes: reviewGapMinutes(workspace, root, config, settings) });
+      nextAtBasis = 'interval';
     }
   }
   flushActivity(true);
@@ -926,21 +990,6 @@ export async function runOnce(options = {}) {
  * GPT 侧额度闸门：只在评审线路允许 GPT（auto 或 gpt）时才算。
  * 线路设成 kimi 时，GPT 额度用不上去，也不该拦下一轮。
  */
-async function gptQuotaGate(workspace) {
-  try {
-    const mod = await import('./codex-review.mjs');
-    let channel = 'auto';
-    try {
-      const dash = JSON.parse(fs.readFileSync(path.join(workspace, '.dsh', 'aris-dashboard.json'), 'utf8'));
-      channel = String((dash && dash.external && dash.external.review && dash.external.review.channel) || 'auto');
-    } catch { /* 没配置按 auto */ }
-    if (channel === 'kimi') return null;
-    return mod.quotaGate(workspace, mod.readCodexConfig(workspace));
-  } catch {
-    return null; // 读不到预算就别拦调度，宁可让它跑一轮再说
-  }
-}
-
 /**
  * 额度类阻塞：流水线自己把 state.json 置成 blocked_on_user，原因是「GPT/Codex 本小时额度用尽」。
  * 这不是要人裁决的事——等到额度窗口滑出就该自己接着跑，所以调度与面板都按「等额度」处理。
@@ -950,11 +999,11 @@ const QUOTA_BLOCK_RE = /额度|配额|quota|429|限流|rate.?limit/i;
 export function isQuotaBlock(block) {
   if (!block || typeof block !== 'object') return false;
   const reason = String(block.reason || '');
-  if (/review_physical_cap/i.test(reason) || /^cap-/.test(reason)) return false;
+  if (/review_physical_cap/i.test(reason) || /^cap-/i.test(String(block.id || reason))) return false;
   const text = [reason, block.summary, block.title, block.id].filter(Boolean).join(' ');
   // 物理送审次数（attempts 15/15）是硬封顶，等一小时也不会恢复，仍算人工。
   if (/物理送审|attempts\s*\d+\s*\/\s*\d+/i.test(text)) return false;
-  return QUOTA_BLOCK_RE.test(text);
+  return /GPT|Codex/i.test(text) && /本小时|小时额度|hourly/i.test(text) && QUOTA_BLOCK_RE.test(text);
 }
 
 /** 把「额度类 blocked_on_user」解回 running；解掉了返回 true。 */
@@ -1173,7 +1222,7 @@ export function cancelStopIntent(root) {
  */
 export async function tick(workspace, { force = false, hooks = null } = {}) {
   const settings = readSettings(workspace);
-  const list = readRegistry(workspace);
+  const list = readRegistry(workspace).filter(entry => executorMode(workspace, readConfig(entry.root)) === 'dsh');
   const cap = Math.max(1, Number(settings.maxConcurrent) || 2);
   let running = 0;
   for (const entry of list) {
@@ -1181,7 +1230,7 @@ export async function tick(workspace, { force = false, hooks = null } = {}) {
   }
   const started = [];
   const skipped = [];
-  const mode = handoffMode(workspace);
+  const mode = 'dsh';
 
   // 在途审稿先收件：回复回来之前起轮没有意义（模型只能空转）。
   const pendingAny = list.some((e) => pendingReviews(settings, e.root).length > 0);
@@ -1191,6 +1240,7 @@ export async function tick(workspace, { force = false, hooks = null } = {}) {
 
   for (const entry of list) {
     const config = readConfig(entry.root);
+    if (executorMode(workspace, config) !== 'dsh') continue;
     const runtime = reconcile(entry.root);
     const pending = pendingReviews(settings, entry.root);
     if (pending.length) {
@@ -1214,44 +1264,17 @@ export async function tick(workspace, { force = false, hooks = null } = {}) {
     if (!config.enabled && !force) continue;
     if (runtime.status === 'running') continue;
 
-    // 额度类 blocked_on_user：不是人工阻塞。额度恢复就解掉继续跑，没恢复就排到恢复时刻。
-    try {
-      const stFile = path.join(entry.root, 'pipeline', 'state.json');
-      let stNow = null;
-      try { stNow = JSON.parse(fs.readFileSync(stFile, 'utf8')); } catch {}
-      if (stNow && String(stNow.status || '') === 'blocked_on_user' && isQuotaBlock(stNow.block)) {
-        const q0 = await gptQuotaGate(workspace);
-        if (q0 && q0.blocked) {
-          const at = q0.freeAt ? new Date(Math.max(Date.parse(q0.freeAt) || 0, Date.now())).toISOString() : new Date(Date.now() + 10 * 60_000).toISOString();
-          if (runtime.nextAt !== at || runtime.nextAtBasis !== 'quota') {
-            saveRuntime(entry.root, { nextAt: at, nextAtBasis: 'quota', waiting: pending.length, gateReason: q0.reason || '等额度恢复' });
-          }
-          skipped.push({ root: entry.root, reason: q0.reason || '等额度恢复' });
-          continue;
-        }
-        if (resumeQuotaBlock(entry.root)) {
-          appendEvent(workspace, { name: entry.name || path.basename(entry.root), text: `${entry.name || path.basename(entry.root)}：额度恢复，解除额度类阻塞并继续` });
-        }
-      }
-    } catch {
-      // 解阻塞失败不拦调度
-    }
-
-    // 小时额度用完：不启新一轮（避免空跑或到送审时被拒），排到恢复时刻；这不是人工阻塞。
-    if (!pending.length) {
+    // 兼容旧执行者写入的 GPT 小时额度阻塞；保留任务并恢复本地调度。
+    const legacy = readText(path.join(entry.root, 'pipeline', 'state.json'));
+    if (runtime.nextAtBasis === 'quota' || legacy?.includes('blocked_on_user')) {
       try {
-        const q1 = await gptQuotaGate(workspace);
-        if (q1 && q1.blocked && q1.freeAt) {
-          const at = new Date(Math.max(Date.parse(q1.freeAt) || 0, Date.now())).toISOString();
-          if (runtime.nextAt !== at || runtime.nextAtBasis !== 'quota') {
-            saveRuntime(entry.root, { nextAt: at, nextAtBasis: 'quota', waiting: 0, gateReason: q1.reason || '等额度恢复' });
-          }
-          skipped.push({ root: entry.root, reason: '等额度恢复：' + (q1.reason || q1.freeAt) });
-          continue;
+        const state = readJsonFull(path.join(entry.root, 'pipeline', 'state.json'));
+        if (state.status === 'blocked_on_user' && isQuotaBlock(state.block)) {
+          const task = state.states?.[state.state]?.todo?.find(item => typeof item === 'string' && !item.startsWith('✅'));
+          if (task) rememberReviewQuota(entry.root, state.block.target || task, task, { blocked: true, reason: state.block.reason });
+          resumeQuotaBlock(entry.root);
         }
-      } catch {
-        // 查额度失败不拦调度
-      }
+      } catch { /* 由预检处理不可读状态。 */ }
     }
 
     // 间隔只由“有没有在途审稿”决定：有就等送审后的 Kimi 取件+审稿，没有就立刻。
@@ -1260,11 +1283,13 @@ export async function tick(workspace, { force = false, hooks = null } = {}) {
       ? pendingWaitUntil(settings, pending)
       : mode === 'kimi' && finishedMs
         ? finishedMs + kimiIntervalMinutes(settings) * 60_000
-        : 0;
+        : mode === 'dsh' && finishedMs
+          ? finishedMs + reviewGapMinutes(workspace, entry.root, config, settings) * 60_000
+          : 0;
     // 预检失败时会把 nextAt 推到 +5 分钟；到期判定要尊重它，否则节拍每 60 秒重算一遍。
     // nextAt 只用来承接「预检失败推迟 5 分钟」这类短期回压；历史遗留的远期值不能把调度锁死
     //（实测一次错误计算写下的 22:59 会让正确算出的 01:44 一直被 max() 丢掉）。
-    const floorMs = Math.min(Date.parse(runtime.nextAt || '') || 0, Date.now() + 5 * 60_000);
+    const floorMs = /^quota/.test(runtime.nextAtBasis || '') ? 0 : Math.min(Date.parse(runtime.nextAt || '') || 0, Date.now() + 5 * 60_000);
     const effectiveDue = Math.max(dueAt || 0, floorMs);
     const due = force || !effectiveDue || effectiveDue <= Date.now();
     if (!due) {
@@ -1281,12 +1306,21 @@ export async function tick(workspace, { force = false, hooks = null } = {}) {
       continue;
     }
     const gate = preflight(entry.root, config, settings, mode);
-    // DSH 模式下若租约持有人早就该收尾了（超过单轮上限 + 10 分钟），判定为死锁并代为释放。
-    if (mode === 'dsh' && /租约/.test(String(gate.reason || ''))) {
-      const reclaimed = reclaimStaleLease(entry.root, config);
-      if (reclaimed) {
-        skipped.push({ root: entry.root, reason: `已代为释放超时租约（${reclaimed.owner}）` });
-        saveRuntime(entry.root, { gateReason: null, lastError: null, nextAt: new Date(Date.now() + 5_000).toISOString() });
+    if (gate.ok) {
+      const selection = chooseRoundTask(workspace, entry.root, config);
+      if (!selection.ok) {
+        // 没任务可派也是一次调度结论：写进 runtime，面板才能说清为什么没起轮。
+        const retryAt = new Date(Date.now() + 5 * 60_000).toISOString();
+        saveRuntime(entry.root, {
+          status: 'idle',
+          lastError: null,
+          blockedUntil: retryAt,
+          nextAt: retryAt,
+          waiting: pending.length,
+          gateReason: selection.reason,
+        });
+        skipped.push({ root: entry.root, reason: selection.reason, blockedTasks: selection.blocked });
+        idleMaintenance(workspace, entry);
         continue;
       }
     }
@@ -1343,9 +1377,9 @@ export function reclaimStaleLease(root, config = {}) {
   const chain = state.chain || {};
   const startedMs = Date.parse(chain.wake_start || '') || 0;
   if (!chain.wake_owner || !startedMs) return null;
-  const limit = (Number(config.maxMinutes) || 45) + 10;
-  const ageMinutes = Math.round((Date.now() - startedMs) / 60_000);
-  if (ageMinutes < limit) return null;
+  const limit = Math.max(70, (Number(config.maxMinutes) || 45) + 10);
+  const ageMinutes = Math.floor((Date.now() - startedMs) / 60_000);
+  if (ageMinutes < limit || chain.wake_owner !== (config.frrs?.half || 'A')) return null;
   const half = config.frrs?.half || 'A';
   try {
     execFileSync(process.env.ARIS_PYTHON || 'python', ['pipeline/gate.py', 'pipeline/state.json', half, '--finish', '--no-progress'], {
@@ -1367,7 +1401,13 @@ export function reclaimStaleLease(root, config = {}) {
     if (!entry || !entry.root) continue;
     const runtime = readRuntime(entry.root);
     if (runtime.status !== 'running') continue;
-    if (runtime.pid && isPidAlive(runtime.pid)) continue;
+    if (RUNNING.has(path.resolve(entry.root).toLowerCase()) || (runtime.pid && isPidAlive(runtime.pid))) continue;
+    if (!runtime.pid) {
+      try {
+        const lock = JSON.parse(readText(lockFile(entry.root)));
+        if (lock.runId === runtime.runId && pidAlive(lock.pid) && Date.now() - Date.parse(lock.at) < 120_000) continue;
+      } catch { /* No matching startup lock. */ }
+    }
     saveRuntime(entry.root, {
       status: 'interrupted',
       pid: null,

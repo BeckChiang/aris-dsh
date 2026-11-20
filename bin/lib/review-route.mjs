@@ -130,33 +130,115 @@ export function readProjectSlots(root) {
  * 把项目切到某条通道：当前槽存进 channels[active]，新通道的槽铺到 reviewers[]。
  * 写后回读，返回真值。
  */
-export function syncProjectRoute(root, channel, name = '') {
-  if (!CHANNELS.has(channel) || channel === 'auto') {
+export function syncProjectRoute(root, channel, name = '', { projectOverride = false } = {}) {
+  if (!CHANNELS.has(channel)) {
     const slots = readProjectSlots(root);
-    return { root, name, ok: true, skipped: true, active: slots.active };
+    return { root, name, ok: true, skipped: true, active: slots.active, reason: '未知通道 ' + channel };
   }
+  if (channel === 'auto') return resetProjectRoute(root, name);
   if (!fs.existsSync(path.join(root, '.aris'))) {
     return { root, name, ok: true, skipped: true, active: null, reason: '没有 .aris 目录' };
   }
   const slots = readProjectSlots(root);
+  const previous = fs.existsSync(slots.file) ? JSON.parse(fs.readFileSync(slots.file, 'utf8')) : {};
   const channels = slots.channels;
   // 把当前生效的 reviewers 归位到它自己的通道（避免手工改过的配置被丢）
   const current = slots.active || 'kimi';
-  const nowReviewers = readJson(slots.file, {}) && readJson(slots.file, {}).reviewers;
+  const nowReviewers = previous.reviewers;
   if (Array.isArray(nowReviewers) && nowReviewers.length) {
     const belongs = channelOfVia((nowReviewers[0] || {}).via);
     if (belongs === 'kimi' || belongs === 'gpt') channels[belongs] = nowReviewers;
   }
   const next = {
+    ...previous,
+    ...(projectOverride ? { projectChannel: channel } : {}),
     version: 2,
     note: `审核线路由 DSH 面板管理：通道 ${channel}；两套槽位都保留在 channels 里，切回去不会丢配置。`,
     active: channel,
     reviewers: structuredClone(channels[channel]),
     channels,
   };
+  // forcedBy / forcedFrom：这条 active 是全局线路强制写下来的，forcedFrom 记的是原先的通道。
+  // 全局切回 auto 时按 forcedFrom 复原；项目级显式选择（projectChannel）优先，不记强制痕迹。
+  if (projectOverride) {
+    delete next.forcedBy;
+    delete next.forcedFrom;
+  } else {
+    next.forcedBy = channel;
+    const from = previous.forcedFrom;
+    if (from === 'kimi' || from === 'gpt') next.forcedFrom = from;
+    else if (slots.active && slots.active !== channel) next.forcedFrom = slots.active;
+    else delete next.forcedFrom;
+  }
   writeJsonAtomic(slots.file, next);
   const after = readProjectSlots(root);
   return { root, name, ok: after.active === channel, active: after.active, file: after.file };
+}
+
+/** 项目自己的槽位推断出来的通道（不看 active）：全局强制改写后要靠它复原。 */
+function inferredProjectChannel(root) {
+  const raw = readJson(projectReviewerFile(root), null);
+  const reviewers = Array.isArray(raw?.reviewers) ? raw.reviewers : [];
+  const first = reviewers[0]?.via;
+  // 有邮箱桥的 frrs 项目默认走 Kimi 邮箱；要走 GPT 会在 projectChannel 里显式记下来。
+  if (fs.existsSync(path.join(root, 'pipeline', 'review', 'mailbox_bridge.py'))) return 'kimi';
+  if (first && reviewers.every((r) => r?.via === first)) {
+    if (first === 'codex') return 'gpt';
+    if (first === 'kimi-mailbox') return 'kimi';
+  }
+  return null;
+}
+
+/**
+ * 全局线路回到 auto：清掉强制痕迹，active 和 reviewers 按项目自己的槽位复原。
+ * 只在 projectNeedsReviewSync 判定需要复原时调用。
+ */
+function resetProjectRoute(root, name = '') {
+  const file = projectReviewerFile(root);
+  const raw = readJson(file, null);
+  if (!raw || typeof raw !== 'object') {
+    return { root, name, ok: true, skipped: true, active: null, reason: '没有 reviewer.json' };
+  }
+  const inferred = inferredProjectChannel(root);
+  const next = { ...raw, version: 2, note: '审核线路回到自动：跟随项目自身槽位（双槽保留，切回去不会丢配置）。' };
+  // 优先用被强制改写前记下的通道，其次按项目槽位推断，别拿强制值当原值。
+  const preferred = raw.forcedFrom === 'kimi' || raw.forcedFrom === 'gpt' ? raw.forcedFrom : inferred;
+  delete next.forcedBy;
+  delete next.forcedFrom;
+  delete next.projectChannel;
+  if (preferred) {
+    next.active = preferred;
+    next.reviewers = structuredClone((raw.channels && raw.channels[preferred]) || []);
+  }
+  writeJsonAtomic(file, next);
+  const after = readProjectSlots(root);
+  return { root, name, ok: true, reset: true, active: after.active, file: after.file };
+}
+
+function projectReviewTarget(root, globalChannel) {
+  if (globalChannel !== 'auto') return globalChannel;
+  const preferred = readJson(projectReviewerFile(root), {})?.projectChannel;
+  return preferred === 'kimi' || preferred === 'gpt' ? preferred : 'auto';
+}
+
+/** Whether saving this global choice would actually rewrite this project's slots. */
+export function projectNeedsReviewSync(root, globalChannel) {
+  if (!fs.existsSync(path.join(root, '.aris'))) return false;
+  const raw = readJson(projectReviewerFile(root), null);
+  if (globalChannel === 'auto') {
+    // 全局回到 auto：被强制改写过的项目要复原；项目自带 projectChannel 的按它对齐。
+    const explicit = raw?.projectChannel === 'kimi' || raw?.projectChannel === 'gpt';
+    if (explicit) return raw?.active !== raw.projectChannel;
+    if (raw?.forcedBy) return true;
+    // 没有痕迹但 active 与项目自身槽位对不上：多轮强制同步留下的旧值，顺手对齐一次。
+    const inferred = inferredProjectChannel(root);
+    return Boolean(inferred) && raw?.active !== inferred;
+  }
+  const channel = projectReviewTarget(root, globalChannel);
+  if (channel === 'auto') return false;
+  return raw?.active !== channel || !raw?.reviewers?.length ||
+    channelOfVia(raw.reviewers[0]?.via) !== channel ||
+    !Array.isArray(raw.channels?.kimi) || !Array.isArray(raw.channels?.gpt);
 }
 
 /**
@@ -171,7 +253,7 @@ export function saveReviewRoute(workspace, channel, projects = []) {
   const raw = readJson(settingsFile(workspace), {}) || {};
   raw.external = { ...(raw.external || {}) };
   raw.external.review = { ...(raw.external.review || {}), channel: next };
-  writeJsonAtomic(settingsFile(workspace), raw);
+  if (readReviewRoute(workspace).channel !== next) writeJsonAtomic(settingsFile(workspace), raw);
   const saved = readReviewRoute(workspace);
   const synced = [];
   for (const p of Array.isArray(projects) ? projects : []) {
@@ -179,7 +261,13 @@ export function saveReviewRoute(workspace, channel, projects = []) {
     if (!root) continue;
     const name = String((p && (p.name || p.label)) || '').trim();
     try {
-      synced.push(syncProjectRoute(root, saved.channel, name));
+      if (!projectNeedsReviewSync(root, saved.channel)) {
+        synced.push({ root, name, ok: true, skipped: true });
+        continue;
+      }
+      const target = projectReviewTarget(root, saved.channel);
+      if (target === 'auto') synced.push(syncProjectRoute(root, 'auto', name));
+      else synced.push(syncProjectRoute(root, target, name, { projectOverride: saved.channel === 'auto' }));
     } catch (e) {
       synced.push({ root, name, ok: false, error: String((e && e.message) || e) });
     }
@@ -187,14 +275,29 @@ export function saveReviewRoute(workspace, channel, projects = []) {
   return { ...saved, projects: synced };
 }
 
-/** 派单前的线路闸门：给 codex/邮箱两侧共用，返回 null 表示放行。 */
-export function routeBlocks(workspace, wanted /* 'kimi' | 'gpt' */) {
+/** Match the project bridge in auto mode; legacy generic ARIS can dispatch individual slots. */
+export function effectiveReviewer(workspace, root) {
   const { channel } = readReviewRoute(workspace);
+  if (channel !== 'auto' || !root) return channel;
+  const raw = readJson(projectReviewerFile(root), null);
+  if (raw?.active === 'kimi' || raw?.active === 'gpt') return raw.active;
+  const reviewers = Array.isArray(raw?.reviewers) ? raw.reviewers : [];
+  const first = reviewers[0]?.via;
+  if (fs.existsSync(path.join(root, 'pipeline', 'review', 'mailbox_bridge.py'))) {
+    return first === 'codex' ? 'gpt' : 'kimi';
+  }
+  if (first && reviewers.every(r => r?.via === first)) {
+    if (first === 'codex') return 'gpt';
+    if (first === 'kimi-mailbox') return 'kimi';
+  }
+  return 'auto';
+}
+
+/** 派单前的线路闸门：给 codex/邮箱两侧共用，返回 null 表示放行。 */
+export function routeBlocks(workspace, wanted, root) {
+  const channel = effectiveReviewer(workspace, root);
   if (channel === 'auto' || channel === wanted) return null;
   const other = channel === 'kimi' ? 'Kimi 邮箱' : 'GPT 外审';
   const self = wanted === 'kimi' ? 'Kimi 邮箱' : 'GPT 外审';
-  const hint = wanted === 'kimi'
-    ? '；审稿请直接用 `node bin/aris-review.mjs --project <项目> --slot 1 --target <稿>`（项目 .aris/reviewer.json 的 slot 1 已指向 GPT），不要再用 --enqueue'
-    : '；要用 GPT 请把面板「审核 → 审核线路」改成 auto 或 gpt';
-  return `审核线路当前设为「${other}」，${self}这条路被关掉了${hint}`;
+  return `当前生效的审核线路为「${other}」，本次「${self}」派单已拦截。请核对项目角色和全局审核设置。`;
 }

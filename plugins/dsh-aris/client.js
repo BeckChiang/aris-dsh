@@ -164,6 +164,7 @@ table.daris2-tbl tbody tr.row.open td:first-child{background:var(--sel)}
 /* 阶段树 */
 .daris2-tree{display:flex;flex-direction:column;gap:1px;font-size:12px}
 .daris2-trow{position:relative;display:flex;align-items:center;gap:7px;height:24px;padding-left:2px}
+.daris2-trow.sub{padding-left:13px}
 .daris2-tree,.daris2-tree ul{list-style:none;margin:0;padding:0}
 .daris2-tree ul{margin-inline-start:6px;padding-inline-start:16px;border-inline-start:1px solid var(--ln)}
 .daris2-tree ul>li{position:relative}
@@ -257,7 +258,6 @@ table.daris2-tbl tbody tr.row.open td:first-child{background:var(--sel)}
 .daris2-field>label{flex:0 0 96px;font-size:11.5px;color:var(--tx3)}
 .daris2-field .ctl{flex:1 1 180px;min-width:0;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .daris2-field .ctl>input,.daris2-field .ctl>select{flex:1 1 120px;min-width:0}
-.daris2-fieldtbl{border:1px solid var(--ln);border-radius:10px;padding:4px 12px;background:var(--dsw-alias-bg-base,#fff)}
 
 /* 产物：左右分栏 + 预览 */
 .daris2-split{display:flex;align-items:stretch;gap:0;flex:1 1 auto;min-height:0;margin-top:8px}
@@ -1046,7 +1046,6 @@ div:not(.daris):has(> div > .daris){display:flex;flex-direction:column;align-ite
 .daris2 .daris2-review-summary .daris2-pie svg{width:70px;height:70px}
 .daris2 .daris2-review-summary .daris2-kpis{margin:0;gap:0;border-top:1px solid var(--ln)}
 .daris2 .daris2-colside{position:static}
-.daris2 .daris2-fieldtbl>summary{padding:10px 14px;cursor:pointer;font-weight:600}
 body[data-ds-dark-theme] .daris select{color-scheme:dark}
 body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
   background:var(--a-bg);color:var(--tx);border-color:var(--a)
@@ -1219,14 +1218,14 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
       const locked = runningPipes.length > 0;
       const route = (codex && codex.route) || { channel: 'auto', options: [] };
       const opts = route.options && route.options.length ? route.options : [
-        { value: 'auto', label: '自动（谁先占锁谁跑）', hint: '' },
+        { value: 'auto', label: '自动（跟随项目）', hint: '' },
         { value: 'kimi', label: 'Kimi 邮箱', hint: '' },
         { value: 'gpt', label: 'GPT 外审', hint: '' },
       ];
       const cur = opts.find((o) => o.value === route.channel) || opts[0];
       return h(Fold, {
         title: '审核线路 · 这一轮走哪条通道',
-        sub: '选定后另一条通道的派单/投递会被直接拒绝；两条都开放就是「自动」，靠审核单飞锁互斥。',
+        sub: '「自动」使用各流水线自己的 DSH 审稿槽。选择 Kimi 或 GPT 会统一工作区的审核线路。',
         badge: cur.label,
         force: force,
         defaultOpen: false,
@@ -1262,6 +1261,71 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
             ? h('div', { className: 'daris-err', style: { marginTop: 6 } },
               `流水线「${runningPipes.join('、')}」正在运行，运行期间审核线路锁定，不能切换——跑到一半换通道会让同一轮出现两种审稿人。等这一轮结束再改。`)
             : null));
+    }
+
+    function RunSettingsCard(props) {
+      const { pipes, busy, act } = props;
+      const [draft, setDraft] = React.useState({});
+      const [msg, setMsg] = React.useState('');
+      const val = (p, key) => {
+        const d = draft[p.root] || {};
+        if (d[key] != null) return String(d[key]);
+        if (key === 'enabled') return p.enabled ? 'true' : 'false';
+        if (key === 'dailyRuns') return String(p.limits ? p.limits.dailyRuns : 0);
+        if (key === 'dailyCny') return String(p.limits ? p.limits.dailyCny : 0);
+        return String(p[key] == null ? '' : p[key]);
+      };
+      const put = (root, key, v) => setDraft(Object.assign({}, draft, { [root]: Object.assign({}, draft[root] || {}, { [key]: v }) }));
+      const dirty = Object.keys(draft).length > 0;
+      const save = async () => {
+        const rows = Object.keys(draft).map((root) => {
+          const row = Object.assign({ root }, draft[root]);
+          if (row.enabled != null) row.enabled = row.enabled === 'true' || row.enabled === true;
+          return row;
+        });
+        const r = await act('pipeline.settings.save', { rows });
+        if (r && r.ok && r.warnings && r.warnings.length) { setDraft({}); setMsg('已保存 ' + rows.length + ' 条；' + r.warnings.join('；')); }
+        else if (r && r.ok) { setDraft({}); setMsg('已保存 ' + rows.length + ' 条'); }
+        else setMsg((r && r.error) || '保存失败');
+      };
+      const num = (p, key, opts) => h('input', Object.assign({
+        className: 'daris-input', style: { width: 72 }, type: 'number',
+        value: val(p, key), onChange: (e) => put(p.root, key, e.target.value),
+      }, opts || {}));
+      return h(Fold, {
+        title: '流水线运行设置 · 全部流水线',
+        sub: '最小间隔用于 GPT 外审：DSH 收尾后隔多久再起下一轮（留空=全局 5 分钟）；审稿走 Kimi 邮箱时自动等 2×取件周期，不用这个值。间隔填 0 表示跟随全局节奏；日轮次 / 日金额填 0 表示不限。改完保存立即重排，正在跑的那一轮不受影响。',
+        badge: String((pipes || []).length) + ' 条',
+        force: props.force,
+        defaultOpen: false,
+      },
+        h('div', null,
+          h('div', { className: 'daris2-tblwrap' },
+            h('table', { className: 'daris2-tbl' },
+              h('thead', null, h('tr', null, ['流水线', '启用', '执行者 / 审稿', '最小间隔', '间隔', '单轮上限', '日轮次', '日金额'].map((t) => h('th', { key: t }, t)))),
+              h('tbody', null, (pipes || []).map((p) => h('tr', { key: p.root },
+                h('td', null, p.name),
+                h('td', null, h('select', {
+                  className: 'daris-input',
+                  value: val(p, 'enabled'),
+                  disabled: busy,
+                  onChange: (e) => put(p.root, 'enabled', e.target.value),
+                }, h('option', { value: 'true' }, '启用'), h('option', { value: 'false' }, '停用'))),
+                h('td', null,
+                  h('span', { className: 'daris2-tag' }, p.mode === 'kimi' ? 'Kimi' : 'DSH'),
+                  h('span', { className: 'daris2-tag' }, p.reviewer === 'kimi' ? 'Kimi 邮箱' : p.reviewer === 'gpt' ? 'GPT 外审' : '按线路')),
+                h('td', null, num(p, 'minIntervalMinutes', { min: 0, max: 240, step: 1 }), h('span', { className: 'daris2-tag' }, '分'),
+                  p.gapMinutes != null && String(p.gapMinutes) !== val(p, 'minIntervalMinutes')
+                    ? h('span', { className: 'daris2-tag' }, '实际 ' + p.gapMinutes + ' 分')
+                    : null),
+                h('td', null, num(p, 'intervalMinutes', { min: 0, max: 1440, step: 1 })),
+                h('td', null, num(p, 'maxMinutes', { min: 5, max: 240, step: 5 })),
+                h('td', null, num(p, 'dailyRuns', { min: 0, step: 1 })),
+                h('td', null, num(p, 'dailyCny', { min: 0, step: 1 }))))))),
+          h('div', { className: 'daris2-toolbar', style: { marginTop: 8 } },
+            h(Btn, { label: '保存运行设置', primary: true, disabled: busy || !dirty, onClick: save }),
+            msg ? h('span', { className: 'daris2-tag' }, msg) : null,
+            h('span', { className: 'daris2-tag' }, '只写改过的行；启停仍走原有按钮逻辑。'))));
     }
 
     function GptReviewCards(props) {
@@ -1549,6 +1613,73 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
           })),
         h('div', { className: 'daris-tag', style: { marginTop: 6 } }, `今日已跑 ${p.today ? p.today.runs : 0} 轮 · ${yu(p.today && p.today.cny)}`));
     }
+    function reviewQuotaLines(p) {
+      const planned = (p.roundBlockedTasks || []).map((item, index) => h('div', { key: 'round-' + index, className: 'daris2-note' },
+        item.task + ' · ' + item.reason + (item.freeAt ? ' · ' + ft(item.freeAt) + ' 后可重试' : '')));
+      return planned.concat((p.reviewQuotaTasks || []).filter(item => !item.blocked).map(item => h('div', { key: item.target, className: 'daris2-note' },
+        '额度已恢复，待送审 · ' + item.task)));
+    }
+
+    function currentTask(p) {
+      const item = (p.plan?.items || []).find(entry => entry && !entry.done && (typeof entry !== 'string' || !entry.trim().startsWith('✅')));
+      return p.roundTask || item?.text || (typeof item === 'string' ? item : '') || (p.running && p.activity?.text) || '';
+    }
+    function handoffNotice(mode) {
+      return mode === 'kimi'
+        ? '请核实目标机器的 A/B 两个自动任务及 DeepSeek 审稿依赖已就绪。确认交接成功后，再手动启用 A/B。'
+        : '请先在 Kimi 停用 A/B 两个自动任务，并确认两个半区都已结束本轮。';
+    }
+    function ProjectRoles({ p, route, workspaceMode, busy, act }) {
+      const [choice, setChoice] = React.useState('');
+      const setting = p.executorSetting || 'inherit';
+      const selected = choice || setting;
+      const nextMode = selected === 'inherit' ? workspaceMode : selected;
+      const kimi = p.mode === 'kimi';
+      const locked = busy || p.running || p.stopping || Number(p.pending) > 0;
+      const applyExecutor = async () => {
+        const result = await act('project.roles', { root: p.root, executor: selected, confirmHandoff: true });
+        if (result?.ok) setChoice('');
+      };
+      const reviewerLabel = kimi
+        ? 'Kimi A/B → DeepSeek'
+        : (p.model || 'DSH') + ' → ' + ({ gpt: 'GPT', kimi: 'Kimi' }[p.reviewer] || '按审核线路');
+      return h(Fold, { title: '执行者与审稿者', meta: reviewerLabel, defaultOpen: false },
+        h('div', { className: 'daris2-field' },
+          h('label', null, '执行者'),
+          h('div', { className: 'ctl' },
+            h('select', {
+              className: 'daris-input', value: selected, disabled: locked,
+              onChange: (e) => setChoice(e.target.value),
+            },
+              h('option', { value: 'inherit' }, '跟随工作区'),
+              h('option', { value: 'dsh' }, 'DSH'),
+              p.kimiPingPong || kimi || setting === 'kimi' ? h('option', { value: 'kimi' }, 'Kimi A/B 双节拍') : null))),
+        selected !== setting
+          ? h('div', { className: 'daris2-flow', style: { marginTop: 8 } }, handoffNotice(nextMode))
+          : null,
+        selected !== setting
+          ? h('div', { className: 'daris2-toolbar', style: { marginTop: 6 } },
+            h(Btn, { label: '确认交接本项目', primary: true, disabled: locked, onClick: applyExecutor }),
+            h(Btn, { label: '取消', disabled: busy, onClick: () => setChoice('') }))
+          : null,
+        h('div', { className: 'daris2-field' },
+          h('label', null, 'DSH 审稿槽'),
+          h('div', { className: 'ctl' },
+            h('select', {
+              className: 'daris-input', value: p.reviewer || '', disabled: locked || kimi || route !== 'auto',
+              onChange: (e) => act('project.roles', { root: p.root, reviewer: e.target.value }),
+            },
+              !['gpt', 'kimi'].includes(p.reviewer) ? h('option', { value: p.reviewer || '', disabled: true }, '项目默认') : null,
+              h('option', { value: 'kimi' }, 'Kimi 邮箱'),
+              h('option', { value: 'gpt' }, 'GPT 外审')),
+            kimi ? h('span', { className: 'daris2-tag' }, 'Kimi 双节拍走 DeepSeek 直审') : null)),
+        kimi || route !== 'auto'
+          ? h('div', { className: 'daris2-flow', style: { marginTop: 6 } },
+            kimi
+              ? 'Kimi 双节拍使用 DeepSeek 审稿；切回 DSH 后使用上面的审稿槽。'
+              : '在设置页将工作区审核线路设为「自动」，即可逐项目选择审稿者。')
+          : null);
+    }
     function HumanBox(props) {
       const p = props.p;
       // 输入内容放在面板层（humanNotes），本组件每轮渲染都会重建，
@@ -1556,9 +1687,20 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
       const text = String((props.notes && props.notes[p.root]) || '');
       const setText = (v) => props.setNote(p.root, v);
       const block = p.plan && p.plan.block ? p.plan.block : null;
-      const reason = block ? block.reason : p.blocked || '';
+      const kimiOwned = p.mode === 'kimi';
+      const reason = block?.reason || p.blocked || props.reason || '';
       const hint = block ? block.hint : '';
-      const summary = `【${p.name}】${p.stage.stage}${block && block.id ? ` · ${block.id}` : ''}\n原因：${reason || '（未记录）'}${hint ? `\n建议：${hint}` : ''}`;
+      const quota = p.physicalQuota || null;
+      const capRows = quota && Array.isArray(quota.rows) ? quota.rows : [];
+      const scopeRows = quota && Array.isArray(quota.scopes) && quota.scopes.length ? quota.scopes : capRows;
+      const decisions = quota && Array.isArray(quota.decisions) ? quota.decisions : [];
+      const [adds, setAdds] = React.useState({});
+      const rowKey = (r) => r.scope + '/' + r.tier;
+      const addOf = (r) => String(adds[rowKey(r)] == null ? '' : adds[rowKey(r)]);
+      const putAdd = (r, v) => setAdds(Object.assign({}, adds, { [rowKey(r)]: v }));
+      const raises = scopeRows.map((r) => ({ scope: r.scope, tier: r.tier, add: Number(addOf(r)) })).filter((r) => Number.isFinite(r.add) && r.add > 0);
+      const defaultNote = '已按面板逐行追加物理送审额度，按 todo 顺序继续。';
+      const summary = `【${p.name}】${p.stage?.stage || p.plan?.current || ''}${block && block.id ? ` · ${block.id}` : ''}\n原因：${reason || '（未记录）'}${hint ? `\n建议：${hint}` : ''}${capRows.length ? '\n封顶：' + capRows.map((r) => `${r.scope} ${r.used}/${r.limit}`).join('；') : ''}`;
       const copy = () => {
         const nav = typeof navigator !== 'undefined' ? navigator : null;
         const extra = p.activity && p.activity.text ? p.activity.text : '—';
@@ -1569,17 +1711,70 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
           props.toast('当前环境不支持自动复制');
         }
       };
+      const stamp = () => new Date().toISOString().slice(0, 16);
+      const saveQuota = async () => {
+        if (!raises.length) return { ok: true };
+        const r = await props.act('quota.raise', { root: p.root, rows: raises, directiveId: 'panel-' + p.root + '-' + stamp() });
+        if (r && r.ok) {
+          const changed = (r.changed || []).map((c) => `${c.scope} ${c.from}→${c.to}`).join('；');
+          props.toast(changed ? '额度已追加：' + changed : '没有需要改的行');
+          setAdds({});
+        } else {
+          props.toast((r && r.error) || '追加失败');
+        }
+        return r || { ok: false };
+      };
+      const restart = async () => {
+        const note = text.trim() || defaultNote;
+        const q = await saveQuota();
+        if (!q.ok) return;
+        const r = await props.act('human.reply', { root: p.root, text: note, restart: true });
+        if (r && r.ok) setText('');
+        else props.toast((r && (r.error || r.reason)) || '重启失败');
+      };
+      const capTable = scopeRows.length
+        ? h('div', { className: 'daris2-tblwrap', style: { marginBottom: 8, maxHeight: 240, overflow: 'auto' } },
+            h('table', { className: 'daris2-tbl' },
+              h('thead', null, h('tr', null, ['送审 scope', '已用 / 上限', '追加次数', '追加后'].map((t) => h('th', { key: t }, t)))),
+              h('tbody', null, scopeRows.map((r) => {
+                const add = Number(addOf(r));
+                const next = Number.isFinite(add) && add > 0 ? r.limit + add : null;
+                const capped = r.limit > 0 && r.used >= r.limit;
+                return h('tr', { key: rowKey(r) },
+                  h('td', null, r.scope, h('span', { className: 'daris2-tag' + (capped ? ' bad' : '') }, r.tier === 'fast' ? 'L1' : 'L2'), capped ? h('span', { className: 'daris2-tag bad' }, '封顶') : null),
+                  h('td', null, `${r.used} / ${r.limit}`),
+                  h('td', null, h('input', {
+                    className: 'daris-input', style: { width: 72 }, type: 'number', min: 1, step: 1,
+                    placeholder: '0', value: addOf(r), disabled: props.busy,
+                    onChange: (e) => putAdd(r, e.target.value),
+                  })),
+                  h('td', null, next ? String(next) : '—'));
+              }))))
+        : h('div', { className: 'daris2-cell2 s', style: { marginBottom: 8 } }, '这个项目还没有物理送审记录（attempts.json 为空），额度表暂无可追加的行。');
+      const decisionList = decisions.length
+        ? h('div', { className: 'daris2-cell2 s', style: { marginBottom: 8 } },
+            '最近裁决：' + decisions.slice(0, 5).map((d) => { const at = Date.parse(d.at || ''); const clock = Number.isFinite(at) ? new Date(at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }) : '--:--'; return `${clock} ${d.scope} ${d.from}→${d.to}`; }).join(' · '))
+        : null;
       return h(Block, { title: '需要人工介入', className: 'human' },
         h('div', { className: 'daris-human-reason' }, reason || '没有记录阻塞原因'),
         hint ? h('div', { className: 'daris-human-hint' }, `建议：${hint}`) : null,
+        capTable,
+        decisionList,
         h('textarea', {
           className: 'daris-input daris-human-input',
-          placeholder: '写一句你的裁决或补充信息；下一轮模型会读到它',
+          placeholder: '写一句你的裁决或补充信息；下一轮模型会读到它（额度表可留空，直接批准也行）',
           value: text,
           onChange: (e) => setText(e.target.value),
         }),
         h('div', { className: 'daris-inline' },
-          h(Btn, { label: '提交并批准重启', primary: true, disabled: props.busy || !text.trim(), onClick: async () => { const r = await props.act('human.reply', { root: p.root, text, restart: true }); if (r && r.ok) setText(''); } }),
+          h(Btn, {
+            label: raises.length ? `追加额度并批准重启（${raises.length} 项）` : '提交并批准重启',
+            primary: true,
+            disabled: props.busy || kimiOwned || p.running,
+            title: kimiOwned ? '此项目由 Kimi A/B 接力执行' : '',
+            onClick: restart,
+          }),
+          h(Btn, { label: '只保存额度', disabled: props.busy || !raises.length, onClick: saveQuota }),
           h(Btn, { label: '只留备注', disabled: props.busy || !text.trim(), onClick: async () => { const r = await props.act('human.reply', { root: p.root, text, restart: false }); if (r && r.ok) setText(''); } }),
           h(Btn, { label: '复制摘要另开对话', onClick: copy })));
     }
@@ -1721,63 +1916,43 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
     // 折叠卡（对齐 mock .m-sec.m-fold）：详情默认展开，审核默认收起。
     function StageTree({ stages, force }) {
       if (!stages.length) return h('div', { className: 'daris2-cell2 s' }, '没有阶段数据');
-      const roots = [];
-      const families = new Map();
-      for (const stage of stages) {
-        const match = /^S(\d+)([a-z])?(?=[_\s-]|$)/i.exec(stage.name);
-        if (!match) {
-          roots.push({ stage });
-          continue;
-        }
-        const id = 'S' + match[1];
-        if (!families.has(id)) {
-          const family = { id, children: [] };
-          roots.push(family);
-          families.set(id, family);
-        }
-        const family = families.get(id);
-        if (!match[2] && !family.stage) family.stage = stage;
-        else family.children.push({ stage });
-      }
       const labels = { done: '已完成', in_progress: '进行中', pending: '待开始', blocked: '受阻' };
       const colors = { done: 'done', in_progress: 'cur', blocked: 'err' };
-      function branch(node) {
-        const stage = node.stage;
-        const name = stage ? stage.name : node.id;
-        const children = node.children || [];
-        const items = stage ? (stage.items || []) : [];
-        const done = items.filter(item => item.done).length;
-        let status = stage && stage.status;
+      // 与「计划项」用同一份 stages、同一顺序：一个阶段一行，前端不造父子层级。
+      // S4a/S4b 这类小阶段各自可见，否则树的行数会比计划项少，看起来像丢了阶段。
+      const forced = force && typeof force.open === 'boolean' ? force.open : null;
+      function branch(stage) {
+        const name = stage.name;
+        const items = stage.items || [];
+        const done = items.filter((item) => item.done).length;
+        const status = stage.status;
         let progress = '';
-        if (stage) {
-          if (items.length) progress = done + '/' + items.length;
-          else if (stage.done != null && stage.total != null) progress = stage.done + '/' + stage.total;
-        } else {
-          const completed = children.filter(child => child.stage.status === 'done').length;
-          const states = children.map(child => child.stage.status);
-          if (completed === children.length) status = 'done';
-          else if (states.includes('blocked')) status = 'blocked';
-          else if (states.includes('in_progress') || completed) status = 'in_progress';
-          else if (states.every(value => value === 'pending')) status = 'pending';
-          progress = completed + '/' + children.length + ' 个子阶段';
-        }
-        const doneItems = stage ? (stage.doneItems || []) : [];
-        const doneArchived = stage ? Number(stage.doneArchived || 0) : 0;
+        if (items.length) progress = done + '/' + items.length;
+        else if (stage.total > 0 && stage.done != null) progress = stage.done + '/' + stage.total;
+        const doneItems = stage.doneItems || [];
+        const doneArchived = Number(stage.doneArchived || 0) || 0;
         const doneTotal = doneItems.length + doneArchived;
-        const expandable = Boolean(items.length || children.length || doneItems.length);
-        const row = h(expandable ? 'summary' : 'div', { className: 'daris2-trow' },
+        const expandable = Boolean(items.length || doneTotal);
+        const sub = /^S\d+[a-z]/i.test(name);
+        const row = h(expandable ? 'summary' : 'div', { className: 'daris2-trow' + (sub ? ' sub' : '') },
           h('span', { className: 'daris2-tdot ' + (colors[status] || '') }),
           h('b', { title: name }, name),
-          h('span', { className: 'tmeta' }, [labels[status] || status || '状态未知', progress, doneTotal ? '已记 ' + doneTotal + ' 项' : ''].filter(Boolean).join(' ')));
+          h('span', { className: 'tmeta' }, [labels[status] || status || '状态未知', progress, doneTotal ? '完成记录 ' + doneTotal + ' 项' : ''].filter(Boolean).join(' ')));
         return h('li', { key: name }, expandable
-          ? h('details', { open: force ? force.open : children.length > 0 || status === 'in_progress' }, row,
-            h('ul', null, items.slice(0, 6).map((item, index) => h('li', { key: index, className: 'daris2-tree-item' },
-              h('span', { title: item.text }, (String(item.text).length > 46 ? String(item.text).slice(0, 46) + '…' : String(item.text))), h('small', null, item.done ? '已完成' : '未完成'))),
-              items.length > 6 ? h('li', { className: 'daris2-tree-more' }, '还有 ' + (items.length - 6) + ' 项') : null,
-              children.map(branch)))
+          ? h('details', { open: forced == null ? status === 'in_progress' : forced }, row,
+            items.length > 0 && h('div', null,
+              h('div', { className: 'daris2-tree-done-h' }, '计划项'),
+              h('ul', null, items.map((item, index) => h('li', { key: index, className: 'daris2-tree-item' },
+                h('span', null, item.text), h('small', null, item.done ? '已完成' : '未完成'))))),
+            doneTotal > 0 && h('div', null,
+              h('div', { className: 'daris2-tree-done-h' }, '完成记录 · ' + doneTotal + ' 项'),
+              doneItems.length > 0 && h('ul', null, doneItems.map((item, index) => h('li', { key: index, className: 'daris2-tree-item done' },
+                h('span', null, item.text),
+                h('small', { title: [item.at, item.runId].filter(Boolean).join(' · ') }, item.verdict || '已完成')))),
+              doneArchived > 0 && h('div', { className: 'daris2-tree-more' }, '另有 ' + doneArchived + ' 项已归档 · pipeline/done-archive.json')))
           : row);
       }
-      return h('ul', { className: 'daris2-tree' }, roots.map(branch));
+      return h('ul', { className: 'daris2-tree' }, stages.map(branch));
     }
 
     function Pane(props) {
@@ -1852,8 +2027,6 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
       const [newRoot, setNewRoot] = React.useState('');
       const [humanNotes, setHumanNotes] = React.useState({});
       const setHumanNote = (root, text) => setHumanNotes((prev) => ({ ...prev, [root]: text }));
-      // 提交答复后，等下一次轮询把 humanActions 刷新掉之前，先乐观收起这一块。
-      const [answered, setAnswered] = React.useState({});
       const [drawer, setDrawer] = React.useState(null);
       // 需人工横条上的「看稿件」：直接打开待裁决稿件的只读全文。
       const openHumanDraft = async (a) => {
@@ -1877,7 +2050,6 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
         try {
           const d = await getState();
           setData(d); setErr(''); setRefreshAt(Date.now());
-          if (!(((d && d.reviews && d.reviews.humanActions) || []).length)) setAnswered({});
           const st = (d && d.settings) || {};
           setForm((prev) => prev || {
             mailbox: st.mailbox || '',
@@ -1915,7 +2087,7 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
         stop: '停用', start: '启用', run: '运行一次', resume: '解除暂停',
         'mailbox.collect': '收件', recover: '检查恢复', 'runtime.reset': '清空运行记录',
         'prompt.reset': '重置提示词', 'human.reply': '提交人工回复', 'workspace.register': '添加工作区',
-        remove: '移除', add: '添加', 'handoff.set': '切换执行权', 'settings.save': '保存设置',
+        remove: '移除', add: '添加', 'handoff.set': '切换执行权', 'project.roles': '更新项目角色', 'settings.save': '保存设置',
       };
       const act = async (name, input) => {
         setBusy(true);
@@ -1924,7 +2096,6 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
           if (r && r.dashboard) { setData(r.dashboard); setRefreshAt(Date.now()); }
           else if (r && r.ok !== false) { try { await load(); } catch { /* 拉取失败交给下一次轮询 */ } }
           if (name === 'human.reply' && r && r.ok) {
-            setAnswered((prev) => ({ ...prev, [String((input && input.root) || '')]: 1 }));
             setTimeout(() => { try { load(); } catch {} }, 1500);
             const rs = r.resumed || null;
             setToast(rs && rs.started ? '已提交并重启：新一轮已开始' : (rs && rs.reason ? '已提交答复：' + rs.reason : '已提交人工答复'));
@@ -1998,6 +2169,13 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
         // 旧版本会把预检原因写进 lastError，导致明明等人工却显示「出错」。
         if (p.stage && p.stage.status === 'blocked_on_user') return { key: 'human', label: '需人工', cls: 'human' };
         if (humanHot.has(p.name)) return { key: 'human', label: '需人工', cls: 'human' };
+        if (!p.roundTask && p.roundBlockedTasks?.some(item => item.human)) return { key: 'human', label: '需人工', cls: 'human' };
+        if (!p.roundTask && p.roundBlockedTasks?.some(item => item.kind === 'gpt-quota')) return { key: 'quota', label: '等 GPT 额度', cls: 'warn' };
+        if (p.mode === 'kimi') {
+          const age = Date.now() - Date.parse(p.stage?.chain?.start);
+          if (age >= 0 && age < 70 * 60_000) return { key: 'externalLease', label: 'Kimi 持有租约', cls: 'run' };
+          return { key: 'external', label: 'Kimi 外部调度', cls: 'idle' };
+        }
         const waitError = /等待人工处理|预检|今日已达上限|在途审稿|租约|等待 Kimi/.test(String(p.lastError || ''));
         if (p.lastError && !waitError) return { key: 'error', label: '出错', cls: 'error' };
         if (p.stopping) return { key: 'stopping', label: '停止中', cls: 'stopping' };
@@ -2008,8 +2186,8 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
         return { key: 'idle', label: '空闲', cls: 'idle' };
       };
       const kindOf = (p) => stateOf(p).key;
-      const LABEL = { error: '出错', human: '需人工', quota: '等额度', stopping: '停止中', run: '正在运行', review: '待审', stop: '已停止', idle: '空闲' };
-      const ORDER = { error: 0, human: 1, quota: 2, run: 3, review: 4, stopping: 5, idle: 6, stop: 7 };
+      const LABEL = { externalLease: 'Kimi 持有租约', external: 'Kimi 外部调度', error: '出错', human: '需人工', quota: '等额度', stopping: '停止中', run: '正在运行', review: '待审', stop: '已停止', idle: '空闲' };
+      const ORDER = { externalLease: 3, external: 6, error: 1, human: 0, quota: 2, run: 3, review: 4, stopping: 5, idle: 6, stop: 7 };
 
       if (!data) {
         return h('div', { className: 'daris daris2' },
@@ -2075,6 +2253,7 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
       const foldTools=(title,set)=>h('div',{className:'daris2-toolbar'},h('b',null,title),h(Btn,{label:'全部展开',onClick:()=>set({open:true})}),h(Btn,{label:'全部折叠',onClick:()=>set({open:false})}));
       const pipeDetail = (p) => {
         const k = kindOf(p);
+        const humanAction = humanAll.find(a => a.name === p.name);
         const plan = p.plan || {};
         const stages = plan.stages || [];
         const stageName = (p.stage && p.stage.stage) || plan.current || '—';
@@ -2112,7 +2291,7 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
             h('span', { className: 'daris2-badge ' + k }, h('i'), LABEL[k] || k),
             h('strong', { className: 'daris2-pipename' }, p.name),
             h('span', { className: 'daris2-chip2' }, p.driver),
-            p.model ? h('span', { className: 'daris2-chip2' }, p.model) : null,
+            p.mode === 'kimi' || p.model ? h('span', { className: 'daris2-chip2' }, p.mode === 'kimi' ? 'Kimi A/B' : p.model) : null,
             interval ? h('span', { style: { fontSize: 11.5, color: 'var(--tx3)' } }, interval) : null,
             h('span', { style: { flex: 1 } }),
             h(Btn, { label: '看日志', onClick: () => openLogs(p.root) }),
@@ -2122,14 +2301,20 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
             h('span', null, '阶段 ', h('b', null, stageName)),
             h('span', { className: 'daris2-pipeprog' }, stages.slice(0, 14).map((sg, i) => h('i', { key: i, className: sg.status === 'done' || sg.name !== stageName && stages.findIndex((x) => x.name === stageName) > i ? 'done' : sg.name === stageName ? 'cur' : '', title: sg.name }))),
             h('span', null, '门禁 ', h('b', null, (gates.done || 0) + '/' + (gates.total || 0))),
-            h('span', null, '下轮 ', h('b', null, p.nextAt ? ft(p.nextAt) : '未排期')),
+            h('span', null, '下轮 ', h('b', null, (k === 'human' || String(p.status || '') === 'blocked' || /blocked_on_user|等待人工|等待裁决/.test(String(p.blocked || '') + String(p.gateReason || ''))) ? '等待人工裁决' : (p.nextAt ? ft(p.nextAt) : '未排期'))),
             h('span', null, '今日 ', h('b', null, (today.runs || 0) + ' 轮 · ' + yu(today.cny))),
             h('span', { className: 'daris2-path', title: p.root }, p.root)),
           h('div', { className: 'daris2-detail-b' },
+            h('div', { className: 'daris2-note' }, h('strong', null, '当前任务　'), currentTask(p) || '暂无已登记任务'),
+            ...reviewQuotaLines(p),
+            k === 'human' || p.roundBlockedTasks?.some(item => item.human)
+              ? h(HumanBox, { p, busy, act, toast: setToast, notes: humanNotes, setNote: setHumanNote, reason: p.roundBlockedTasks?.find(item => item.human)?.reason || humanAction?.detail || humanAction?.title })
+              : p.blocked ? h('div', { className: 'daris2-band warn' }, p.blocked) : null,
+            h(ProjectRoles, { key: p.root + ':' + p.executorSetting + ':' + p.mode, p, route: cx.route?.channel, workspaceMode: ho.mode || 'dsh', busy, act }),
             h('div', { className: 'daris2-cols' },
               h('div', { className: 'daris2-colmain' },
                 foldTools('轮次与进度',setMainFold),
-                h(Pane, { force:mainFold, title: '每轮指标', meta: '最近 ' + Math.min(hist.length, 24) + ' 轮 · 成本 / 步数 / 耗时 · 超宽横滚', defaultOpen: true },
+                h(Pane, { force:mainFold, title: '每轮指标', meta: '最近 ' + Math.min(hist.length, 24) + ' 轮 · 成本 / 步数 / 耗时', defaultOpen: false },
                   h(BarChart, {
                     height: 150,
                     data: hist.slice(-24).map((x) => ({ label: '', cny: x.cny, steps: x.steps, ms: x.ms, verdict: x.verdict })),
@@ -2167,8 +2352,21 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
                               h('td', { className: 'st' }, h('span', { className: 'daris2-tdot done' }), it.verdict || '已完成'),
                               h('td', { className: 'tx', title: (it.text || '') + (it.at ? String.fromCharCode(10) + it.at : '') + (it.runId ? String.fromCharCode(10) + it.runId : '') }, (i + 1) + '. ' + cap(it.text, 90))))))) : null);
                     }))
-                    : h('div', { className: 'daris2-empty' }, '这一阶段没有计划项')),
-                h(Pane, { force:mainFold, title: '轮次历史', meta: hist.length + ' 轮记录', defaultOpen: true },
+                    : h('div', { className: 'daris2-empty' }, '这一阶段没有计划项'))),
+              h('div', { className: 'daris2-colside' },
+                foldTools('阶段与审核',setSideFold),
+                h(Pane, { force:sideFold, title: '最新审核回件', defaultOpen: true },
+                  h(LatestReview, { result: latestReview })),
+                h(Pane, { force:sideFold, title: '阶段树', meta: treeStages.length + ' 个阶段 · 展开查看子项', defaultOpen: true },
+                  h(StageTree, { key: p.root || p.name, stages: treeStages, force: sideFold }),
+                ),
+                h(Pane, { force:sideFold, title: '总计划', meta: (plan.percent != null ? plan.percent + '%' : '—') + ' · 完成 ' + (plan.done || 0) + '/' + (plan.total || 0) + (stageName ? ' · 当前 ' + stageName : ''), defaultOpen: true },
+                  h('div', { className: 'daris2-prog' }, h('i', { style: { width: (plan.percent || 0) + '%' } })),
+                  h('div', { className: 'daris2-cell2 s', style: { margin: '6px 0 8px' } }, plan.currentStatus ? '已开始 ' + (plan.done || 0) + '/' + (plan.total || 0) + ' 步' : '还没有计划数据'),
+                  plan.block && plan.block.reason
+                    ? h('div', { className: 'daris2-note' }, '门禁 · ' + plan.block.reason + (plan.block.hint ? '：' + plan.block.hint : ''))
+                    : null),
+                h(Pane, { force:sideFold, title: '轮次历史', meta: hist.length + ' 轮记录', defaultOpen: true },
                   h('div', { style: { maxHeight: 268, overflow: 'auto' } },
                     h('table', { className: 'daris2-lgtbl' },
                       h('thead', null, h('tr', null,
@@ -2184,20 +2382,7 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
                         h('td', { className: 'num' }, x.steps != null ? String(x.steps) : '—'),
                         h('td', { className: 'num' }, x.cny != null ? yu(x.cny) : '—'),
                         h('td', null, h('span', { className: 'daris2-verdict ' + sv(x.verdict) }, vt(x.verdict))),
-                        h('td', { className: 'num' }, x.exit != null ? String(x.exit) : '—')))))))),
-              h('div', { className: 'daris2-colside' },
-                foldTools('阶段与审核',setSideFold),
-                h(Pane, { force:sideFold, title: '最新审核回件', defaultOpen: true },
-                  h(LatestReview, { result: latestReview })),
-                h(Pane, { force:sideFold, title: '阶段树', meta: treeStages.length + ' 个阶段 · 展开查看子项', defaultOpen: true },
-                  h(StageTree, { key: p.root || p.name, stages: treeStages, force: sideFold }),
-                ),
-                h(Pane, { force:sideFold, title: '总计划', meta: (plan.percent != null ? plan.percent + '%' : '—') + ' · 完成 ' + (plan.done || 0) + '/' + (plan.total || 0) + (stageName ? ' · 当前 ' + stageName : ''), defaultOpen: true },
-                  h('div', { className: 'daris2-prog' }, h('i', { style: { width: (plan.percent || 0) + '%' } })),
-                  h('div', { className: 'daris2-cell2 s', style: { margin: '6px 0 8px' } }, plan.currentStatus ? '已开始 ' + (plan.done || 0) + '/' + (plan.total || 0) + ' 步' : '还没有计划数据'),
-                  plan.block && plan.block.reason
-                    ? h('div', { className: 'daris2-note' }, '门禁 · ' + plan.block.reason + (plan.block.hint ? '：' + plan.block.hint : ''))
-                    : null),
+                        h('td', { className: 'num' }, x.exit != null ? String(x.exit) : '—'))))))),
                 (p.events || []).length
                   ? h(Pane, { force:sideFold, title: '最近事件', meta: (p.events || []).length + ' 条', defaultOpen: true },
                     h('table', { className: 'daris2-lgtbl' }, h('tbody', null, (p.events || []).slice(-8).reverse().map((ev, i) => h('tr', { key: i },
@@ -2231,7 +2416,7 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
             p.stage && p.stage.status === 'paused'
               ? h(Btn, { key: 'resume', label: '解除暂停', primary: true, disabled: busy, onClick: () => act('resume', { root: p.root }) })
               : null,
-            h(Btn, { key: 'run', label: p.running ? '运行中…' : '运行一次', primary: true, disabled: busy || p.running || kindOf(p) === 'human', title: kindOf(p) === 'human' ? '当前需人工裁决，先在审核页提交答复' : '', onClick: () => act('run', { root: p.root }) }),
+            h(Btn, { key: 'run', label: p.running ? '运行中…' : '运行一次', primary: true, disabled: busy || p.running || p.mode === 'kimi' || kindOf(p) === 'human', title: kindOf(p) === 'human' ? '当前需人工裁决，先在审核页提交答复' : '', onClick: () => act('run', { root: p.root }) }),
             p.stopping
               ? h(Btn, { key: 'unstop', label: '取消停止', title: '撤回停止意图：本轮继续跑完，之后照常起下一轮', disabled: busy, onClick: () => act('start', { root: p.root }) })
               : null,
@@ -2300,7 +2485,7 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
         const items = (plan && plan.items) || [];
         const capN = Number(data.eventsPerCard) || 6;
         const events = (p.events || []).slice().reverse().slice(0, capN);
-        const needsHuman = st.key === 'human' && !answered[p.root];
+        const needsHuman = st.key === 'human';
         const waiting = Number(p.pending) > 0;
         const review = p.lastReview || null;
         const activity = p.activity || null;
@@ -2379,7 +2564,7 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
               h('div', { className: 'daris-fact' }, h('span', { className: 'daris-k' }, '最近会话'), h('span', { className: 'daris-v daris-mono', title: p.lastSessionId || '' }, p.lastSessionId || '—')))),
           h(Block, { title: '操作 · 按影响分级（L0 只读 / L1 可逆 / L2 阻断 / L3 破坏）' }, actionTier(p)),
           h(Block, { title: '每日上限' }, h(LimitsBox, { p, busy, act })),
-          needsHuman ? h(HumanBox, { p, busy, act, toast: setToast, notes: humanNotes, setNote: setHumanNote }) : null,
+          needsHuman ? h('div', { className: 'daris-alerts' }, h(Btn, { label: '去详情裁决', primary: true, onClick: () => { changeScope(p.name); setTab('pipes'); } })) : null,
           (p.blocked && !needsHuman) || p.lastError
             ? h('div', { className: 'daris-alerts' },
               p.blocked && !needsHuman ? h(Full, { value: `预检：${p.blocked}` }) : null,
@@ -2410,11 +2595,12 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
                 h('div', { className: 'daris2-rail' }, stg.slice(0, 12).map((x, i) => h('i', { key: i, className: x.status === 'done' ? 'done' : x.status === 'in_progress' ? 'cur' : '' }))),
                 h('div', { className: 'daris2-cell2 s' }, stg.length ? `${stg.filter((x) => x.status === 'done').length}/${stg.length}` : '')),
               h('td', null, h('div', { className: 'daris2-now' },
-                (p.running ? '运行中 · ' : '') + ((p.activity && p.activity.text) || (p.blocked ? '等待裁决 · ' + (plan.block && plan.block.reason || p.blocked) : p.lastRun ? '上轮 ' + (p.lastRun.verdict || '完成') : (!p.enabled ? '已停用 · 不参与节拍' : '空闲')))),
-              h('div', { className: 'daris2-now-s' }, p.history && p.history[0] ? `${p.history[0].steps} 步 · ${Math.max(1, Math.round((p.history[0].ms || 0) / 60000))} 分钟 · 上下文 ${p.budget && p.budget.ctxPct != null ? p.budget.ctxPct + '%' : '—'}` : '—')),
+                currentTask(p) || '暂无已登记任务'),
+              h('div', { className: 'daris2-now-s' }, plan.block?.reason || p.blocked || '')),
               h('td', { className: 'num' }, gates.total ? `${gates.done}/${gates.total}` : '—'),
               h('td', { className: 'num' }, (p.blockers && p.blockers.length) ? h('span', { className: 'daris2-badge human' }, p.blockers.length) : '—'),
-              h('td', null, p.pending ? h('span', { className: 'daris2-badge review' }, `${p.pending} 轮未送审`) : h('span', { className: 'daris2-cell2 s' }, '无待送审'),
+              h('td', null, p.pending ? h('span', { className: 'daris2-badge review' }, `${p.pending} 份审稿在途`) : h('span', { className: 'daris2-cell2 s' }, '无在途审稿'),
+                ...reviewQuotaLines(p),
                 h('div', { className:'daris2-cell2 s' }, reviewCounts(p.name)),
                 h('div', { className: 'daris2-cell2 s' }, p.lastReview ? `${p.lastReview.verdict || ''}${p.lastReview.score != null ? ' ' + p.lastReview.score : ''}` : '未审'),
                 mustLine(p.name) ? h('div', { style: { marginTop: 3 } }, h('span', { className: 'daris2-tag must' }, mustLine(p.name))) : null),
@@ -2426,7 +2612,8 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
                 p.running
                   ? h(Btn, { label: '停止', disabled: busy, onClick: () => act('stop', { root: p.root }) })
                   : p.enabled
-                    ? h(Btn, { label: '运行一次', primary: true, disabled: busy || kindOf(p) === 'human', title: kindOf(p) === 'human' ? '当前需人工裁决，先在审核页提交答复' : '', onClick: () => act('run', { root: p.root }) })
+                    ? (k === 'human' ? h(Btn, { label: '人工裁决', primary: true, onClick: () => { changeScope(p.name); setTab('pipes'); } })
+                      : h(Btn, { label: '运行一次', primary: true, disabled: busy || p.mode === 'kimi', onClick: () => act('run', { root: p.root }) }))
                     : h(Btn, {
                       label: armed === startKey(p) ? '确认启用' : '启用',
                       title: '启用后立即参与节拍：会起一轮、花额度、写产物；点两次确认',
@@ -2467,6 +2654,17 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
         ];
         const detail = ovOpen ? pipes.find((p) => p.name === ovOpen) : null;
         body = h('div', null,
+          h('section', { className:'daris2-card' },
+            h('div',{className:'daris2-card-h'},'流水线'),
+            h('div',{className:'daris2-tblwrap'},h('table',{className:'daris2-tbl'},
+              h('thead',null,h('tr',null,['名称','状态','当前任务','阻塞原因','人工裁决','下轮时间'].map(title=>h('th',{key:title},title)))),
+              h('tbody',null,rows.map(p=>h('tr',{key:p.root},
+                h('td',null,h('button',{className:'daris2-link',onClick:()=>{changeScope(p.name);setTab('pipes')}},p.name)),
+                h('td',null,h('span',{className:'daris2-badge '+kindOf(p)},LABEL[kindOf(p)])),
+                h('td',null,currentTask(p) || p.stage?.stage || '—'),
+                h('td',null,p.plan?.block?.reason || p.blocked || '—'),
+                h('td',null,kindOf(p) === 'human' ? h(Btn,{label:'人工裁决',onClick:()=>{changeScope(p.name);setTab('pipes');}}) : '—'),
+                h('td',null,p.nextAt?ft(p.nextAt):'—'))))))),
           h('div', { className: 'daris2-charts' }, [['runs','今日轮次'],['cny','今日成本（元）']].map(([field,title]) => {
             const max = pipes.reduce((m,p) => Math.max(m, Number(p.today && p.today[field]) || 0), 0);
             return h('section', { className: 'daris2-card', key: field },
@@ -2477,16 +2675,6 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
                   h('span',null,h('i',{style:{width:(max && v != null ? 100*v/max : 0)+'%'}})),h('b',null,v == null ? '—' : field === 'cny' ? yu(v) : v));
               })));
           })),
-          h('section', { className:'daris2-card' },
-            h('div',{className:'daris2-card-h'},'流水线'),
-            h('div',{className:'daris2-tblwrap'},h('table',{className:'daris2-tbl'},
-              h('thead',null,h('tr',null,['名称','状态','当前阶段','今日轮次','今日成本','审核结论 · 各稿最近一轮','下轮时间'].map(title=>h('th',{key:title},title)))),
-              h('tbody',null,pipes.map(p=>h('tr',{key:p.root},
-                h('td',null,h('button',{className:'daris2-link',onClick:()=>{changeScope(p.name);setTab('pipes')}},p.name)),
-                h('td',null,h('span',{className:'daris2-badge '+kindOf(p)},LABEL[kindOf(p)])),
-                h('td',null,p.stage?.stage||'—'),h('td',null,p.today?.runs??'—'),
-                h('td',null,p.today?.cny==null?'—':yu(p.today.cny)),h('td',null,reviewCounts(p.name)),
-                h('td',null,p.nextAt?ft(p.nextAt):'—'))))))),
           h('div', { className: 'daris2-kpis' }, kpi.map(([k, v, x, kind], i) => h('div', { key: i, className: 'daris2-kpi is-' + kind },
             h('div', { className: 'daris2-kpi-k' }, k),
             h('div', { className: 'daris2-kpi-v' }, String(v)),
@@ -2625,13 +2813,8 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
                 h('div', { className: 'daris2-gate-b' },
                   h('div', { className: 'daris2-gate-reason' }, a.title || '需要人工确认'),
                   a.detail ? h('div', { className: 'daris2-gate-advice' }, a.detail) : null,
-                  h('textarea', {
-                    className: 'daris2-ta', placeholder: '给流水线的回复（会作为 human.reply 的正文）',
-                    value: note, onChange: (e) => setHumanNote(root, e.target.value),
-                  }),
                   h('div', { className: 'daris2-gate-acts' },
-                    h(Btn, { label: '提交并批准重启', primary: true, disabled: busy || !note.trim(), onClick: async () => { if (note.trim()) { await act('human.reply', { root, text: note.trim(), restart: true }); setHumanNote(root, ''); } } }),
-                    h(Btn, { label: '只留备注', disabled: busy || !note.trim(), onClick: async () => { if (note.trim()) { await act('human.reply', { root, text: note.trim(), restart: false }); setHumanNote(root, ''); } } }),
+                    h(Btn, { label: '去流水线详情裁决', primary: true, onClick: () => { changeScope(a.name); setTab('pipes'); } }),
                     h(Btn, { label: '复制摘要另开对话', onClick: () => { copyText(summary); setToast('已复制摘要，可粘贴到新会话'); } }))));
             }))
             : null,
@@ -2647,10 +2830,21 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
           h(Fold, { title: 'Kimi 邮箱 · 投递与取件', meta: `待处理 ${mb.pending || 0}`, force: foldForce, defaultOpen: false },
             h('div', null,
               h(Sub, { title: '执行权', meta: ho.mode === 'kimi' ? 'Kimi Work' : 'DSH' },
-                h('div', { className: 'daris2-flow' }, '同一时刻只能有一方执行。交回 Kimi 时会先停掉本机所有流水线，DSH 只保留收件。'),
+                h('div', { className: 'daris2-flow' }, '工作区交接仅影响执行者设为「跟随工作区」的项目。'),
                 h('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 } },
-                  h(Btn, { label: 'DSH 接管', primary: ho.mode === 'dsh', disabled: busy, onClick: () => act('handoff.set', { mode: 'dsh' }) }),
-                  h(Btn, { label: '交回 Kimi Work', primary: ho.mode === 'kimi', disabled: busy, onClick: () => act('handoff.set', { mode: 'kimi' }) }),
+                  ['dsh', 'kimi'].map(mode => {
+                    const key = 'handoff:' + mode;
+                    const selected = armed === key;
+                    const label = mode === 'kimi' ? '交回 Kimi Work' : 'DSH 接管';
+                    return h(Btn, { key, label: selected ? '确认' + label : label, primary: ho.mode === mode || selected,
+                      disabled: busy || mode === (ho.mode || 'dsh'),
+                      onClick: () => {
+                        if (!selected) return setArmed(key);
+                        setArmed('');
+                        act('handoff.set', { mode, confirmHandoff: true });
+                      } });
+                  }),
+                  armed === 'handoff:kimi' || armed === 'handoff:dsh' ? h('span', { role: 'status' }, handoffNotice(armed.slice(8))) : null,
                   h('span', { className: 'daris2-tag' }, ho.at ? `最近切换 ${ft(ho.at)}` : '尚未切换过'))),
               h(Sub, { title: '邮箱与收件', meta: `${mb.pending || 0} 封待处理` },
                 h('div', { className: 'daris2-prev-path', style: { padding: 0 } }, mb.path || '未配置'),
@@ -2687,9 +2881,8 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
         body = h('div', null,
           h(RouteCard, { codex: cx, busy, act, pipes: allPipes, force: routeFocus }),
           h(Fold,{title:'GPT 后台启停 · 全局',defaultOpen:false},h(Btn,{label:cf.enabled?'停用':'启用',disabled:busy,onClick:()=>act('codex.save',{codex:{enabled:!cf.enabled}})})),
-          h(Fold,{title:'流水线运行配置 · 只读',defaultOpen:false},pipes.map((p)=>h('p',{key:p.name},p.name+' · '+(p.model||'—')+' · 间隔 '+(p.intervalMinutes??'—')+' 分钟 · '+(p.enabled?'已启用':'已停用')+' · 每日轮数 '+(p.limits?.dailyRuns===0?'不限':p.limits?.dailyRuns??'—')+' · 每日金额 '+(p.limits?.dailyCny===0?'不限':p.limits?.dailyCny??'—')))),
-          h('details', { className: 'daris2-fieldtbl' },
-            h('summary', null, '邮箱与运行参数 · 全局'),
+          h(RunSettingsCard, { pipes, busy, act }),
+          h(Fold, { title: '邮箱与运行参数 · 全局', meta: '保存后立即生效', defaultOpen: false },
             field('邮箱目录', h('input', { className: 'daris-input', style: { flex: '1 1 220px' }, value: f.mailbox, onChange: (e) => setForm({ ...f, mailbox: e.target.value }) })),
             field('默认模型', h('select', { className: 'daris-input', value: f.model, onChange: (e) => setForm({ ...f, model: e.target.value }) },
               h('option', { value: 'deepseek-flash' }, 'deepseek-flash'),
@@ -2697,9 +2890,9 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
             field('同时运行', h('input', { className: 'daris-input', style: { width: 90 }, type: 'number', min: 1, value: f.maxConcurrent, onChange: (e) => setForm({ ...f, maxConcurrent: e.target.value }) })),
             field('单轮超时', h('input', { className: 'daris-input', style: { width: 90 }, type: 'number', min: 5, value: f.maxMinutes, onChange: (e) => setForm({ ...f, maxMinutes: e.target.value }) }), h('span', { className: 'daris2-tag' }, '分钟')),
             field('卡片事件条数', h('input', { className: 'daris-input', style: { width: 90 }, type: 'number', min: 0, max: 30, value: evCap, onChange: (e) => { evCapDirty.current = true; setEvCap(e.target.value); } })),
-          h('div', { className: 'daris2-toolbar' },
-            h(Btn, { label: '保存设置', primary: true, disabled: busy, onClick: () => act('settings.save', { settings: { mailbox: f.mailbox, model: f.model, maxConcurrent: Number(f.maxConcurrent), maxMinutes: Number(f.maxMinutes), eventsPerCard: Number(evCap) || 0 } }) }),
-            h('span', { className: 'daris2-tag' }, '保存后立即生效；邮箱目录变更会让下一次收件改道。'))),
+            h('div', { className: 'daris2-toolbar', style: { marginTop: 8 } },
+              h(Btn, { label: '保存设置', primary: true, disabled: busy, onClick: () => act('settings.save', { settings: { mailbox: f.mailbox, model: f.model, maxConcurrent: Number(f.maxConcurrent), maxMinutes: Number(f.maxMinutes), eventsPerCard: Number(evCap) || 0 } }) }),
+              h('span', { className: 'daris2-tag' }, '保存后立即生效；邮箱目录变更会让下一次收件改道。'))),
           h('div', { className: 'daris2-grid2' },
             h('div', { className: 'daris2-card' },
               h('div', { className: 'daris2-card-h' }, '运行环境'),

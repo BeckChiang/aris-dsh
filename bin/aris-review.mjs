@@ -912,7 +912,7 @@ function refsSection(refs) {
 function cmdEnqueue(cfg, args, mb, { prompts, target, round }) {
   ensureMailbox(mb);
   const targetRel = relTo(cfg.project, target.abs);
-  const routeBlocked = routeBlocks(REPO_ROOT, 'kimi');
+  const routeBlocked = routeBlocks(REPO_ROOT, 'kimi', cfg.project);
   if (routeBlocked) fail(routeBlocked);
   const lock = acquireReviewLock(REPO_ROOT, {
     channel: 'kimi',
@@ -1349,6 +1349,7 @@ async function reviewViaCodex(cfg, prompts, round) {
     root: cfg.project,
     taskKey: cfg.taskKey || 'routine_review',
     task,
+    quotaTarget: String(cfg.target || '').replaceAll('\\', '/'),
     model: overrideModel,
     effort: overrideEffort,
     stamp: `r${round}-slot${cfg.slot}-${localStamp(new Date())}`,

@@ -10,10 +10,23 @@ import crypto from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import { acquireReviewLock, inspectReviewLock, releaseReviewLock, reviewLockFile } from './review-lock.mjs';
 import { readCodexQuota } from './codex-quota.mjs';
-import { readReviewRoute, routeBlocks } from './review-route.mjs';
+import { readReviewRoute, routeBlocks } from './review-route.mjs?v=5';
 
 export const CODEX_HOME = path.join(os.homedir(), '.codex');
 const WINDOW_MS = 60 * 60 * 1000;
+
+/** 本机时区的自然日键（YYYY-MM-DD）：额度账本和面板「今日」必须同一口径。 */
+function dayKey(date = new Date()) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate());
+}
+
+/** 本机时区次日 0 点：日额度在这里恢复。 */
+function nextDayStart() {
+  const d = new Date();
+  d.setHours(24, 0, 0, 0);
+  return d;
+}
 
 /** 任务分类：按「这一单要审什么」分档，不对应流水线阶段。
  *  流水线阶段会变（S1…S6 是某篇论文的分法），任务类型是稳定的。 */
@@ -423,11 +436,12 @@ export function readBudget(workspace) {
     .map((v) => Number(v))
     .filter((v) => Number.isFinite(v) && now - v < WINDOW_MS);
   const day = raw.day && typeof raw.day === 'object' ? raw.day : {};
-  const today = new Date().toISOString().slice(0, 10);
+  // 旧记录里存的是 UTC 日期，跨到本地新的一天时自然归零，不需要迁移。
+  const today = dayKey();
   return {
     corrupt,
     calls,
-    day: { date: day.date === today ? today : today, count: day.date === today ? Number(day.count) || 0 : 0 },
+    day: { date: today, count: day.date === today ? Number(day.count) || 0 : 0 },
     consecutiveFailures: Number(raw.consecutiveFailures) || 0,
     last: raw.last || null,
   };
@@ -442,6 +456,7 @@ export function checkBudget(workspace, cfg = readCodexConfig(workspace)) {
   const budget = readBudget(workspace);
   const used = budget.calls.length;
   const remaining = Math.max(0, cfg.hourlyLimit - used);
+  if (budget.corrupt) return { ok: false, reason: '额度记录损坏，需人工确认', remaining };
   if (remaining <= 0) {
     const oldest = Math.min(...budget.calls);
     const waitMinutes = Math.max(1, Math.ceil((WINDOW_MS - (Date.now() - oldest)) / 60000));
@@ -474,11 +489,47 @@ export function quotaGate(workspace, cfg = readCodexConfig(workspace)) {
   if (budget.consecutiveFailures >= 3) {
     return { blocked: true, freeAt: null, minutes: null, reason: '连续 3 次失败，需人工恢复', used, limit };
   }
+  if (cfg.dailyLimit > 0 && budget.day.count >= cfg.dailyLimit) {
+    // 本地次日 0 点恢复；原来按 UTC 日期 +24h 算，实际会拖到北京时间早上 8 点才放行。
+    const freeAt = nextDayStart().toISOString();
+    return { blocked: true, freeAt, minutes: Math.max(1, Math.ceil((Date.parse(freeAt) - Date.now()) / 60000)), reason: '今日 GPT 审稿额度已用完', used, limit };
+  }
   if (used < limit) return { blocked: false, freeAt: null, minutes: 0, used, limit };
   const sorted = [...budget.calls].sort((a, b) => a - b);
   const freeMs = sorted[Math.max(0, used - limit)] + WINDOW_MS;
   const minutes = Math.max(1, Math.ceil((freeMs - Date.now()) / 60000));
   return { blocked: true, freeAt: new Date(freeMs).toISOString(), minutes, reason: `本小时额度已用完（${limit} 次/小时）`, used, limit };
+}
+
+function quotaWaitFile(root, target) {
+  const normalized = path.isAbsolute(target) ? path.relative(root, target) : target;
+  const key = crypto.createHash('sha256').update(normalized.replaceAll('\\', '/').replace(/^\.\//, '')).digest('hex');
+  return path.join(root, '.aris-run', 'review-quota', key + '.json');
+}
+
+export function rememberReviewQuota(root, target, task, gate) {
+  if (!root || !target || !gate.blocked) return;
+  const file = quotaWaitFile(root, target);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  writeJsonAtomic(file, { target, task: task || target, reason: gate.reason, freeAt: gate.freeAt || null });
+}
+
+export function reviewQuotaTasks(workspace, root) {
+  if (routeBlocks(workspace, 'gpt', root)) return [];
+  const dir = path.join(root, '.aris-run', 'review-quota');
+  let names;
+  try { names = fs.readdirSync(dir); } catch { return []; }
+  const gate = quotaGate(workspace);
+  const staleMs = 7 * 24 * 60 * 60 * 1000;
+  return names.filter(name => /^[a-f0-9]{64}\.json$/.test(name)).sort().flatMap(name => {
+    try {
+      const file = path.join(dir, name);
+      // 超过 7 天的记录不再提示：对应送审包多半已改名或删除，留着只会显示成「额度已恢复，待送审」。
+      if (Date.now() - fs.statSync(file).mtimeMs > staleMs) return [];
+      const entry = JSON.parse(fs.readFileSync(file, 'utf8'));
+      return entry.target && entry.task ? [{ ...entry, blocked: gate.blocked, freeAt: gate.freeAt, reason: gate.reason || '' }] : [];
+    } catch { return []; }
+  });
 }
 
 function recordCall(workspace, { ok, entry }) {
@@ -534,7 +585,7 @@ export async function runCodexReview(input) {
   const taskKey = String(input.taskKey || input.gate || 'routine_review');
   const cfg = readCodexConfig(workspace);
   if (!cfg.enabled) return { ok: false, skipped: true, error: 'GPT 外审未启用（面板「审核」开关）' };
-  const blocked = routeBlocks(workspace, 'gpt');
+  const blocked = routeBlocks(workspace, 'gpt', root);
   if (blocked) return { ok: false, blocked: true, error: blocked };
   const pick = cfg.tasks[taskKey] || { model: 'gpt-6.2-sol', effort: 'medium', enabled: true };
   if (pick.enabled === false) return { ok: false, skipped: true, error: `任务分类 ${taskKey} 未启用 GPT 外审` };
@@ -570,12 +621,19 @@ export async function runCodexReview(input) {
     };
   }
 
-  const gateCheck = checkBudget(workspace, cfg);
-  if (!gateCheck.ok) return { ok: false, limited: true, error: gateCheck.reason, remaining: gateCheck.remaining };
-
   const timeoutMs = cfg.timeoutMinutes * 60_000;
   const lock = freshLock(workspace, timeoutMs + 60_000, taskKey);
   if (!lock.ok) return { ok: false, busy: true, error: '已有一次外审在跑，等它结束再派单' };
+
+  const quotaTarget = String(input.quotaTarget || input.target || files.map(file => file.rel).join('、'));
+  const gate = quotaGate(workspace, cfg);
+  const gateCheck = checkBudget(workspace, cfg);
+  if (gate.blocked || !gateCheck.ok) {
+    releaseLock(workspace);
+    const reason = gate.reason || gateCheck.reason;
+    rememberReviewQuota(root, quotaTarget, input.quotaTask, { ...gate, blocked: true, reason });
+    return { ok: false, limited: true, error: reason, freeAt: gate.freeAt, remaining: gateCheck.remaining };
+  }
 
   const stamp = input.stamp || new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const dir = runDir(root);
@@ -712,6 +770,7 @@ export async function runCodexReview(input) {
     error: ok ? '' : (result.timedOut ? `超过 ${cfg.timeoutMinutes} 分钟被终止` : (result.stderr || result.stdout || '').trim().slice(-400) || `退出码 ${result.code}`),
   };
   const budget = recordCall(workspace, { ok, entry });
+  if (ok) { try { fs.unlinkSync(quotaWaitFile(root, quotaTarget)); } catch { /* No deferred record. */ } }
 
   if (!ok) {
     return {

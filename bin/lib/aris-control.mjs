@@ -27,10 +27,13 @@ import {
 } from './aris-registry.mjs?v=46';
 // 调度器改得最勤：版本串跟随插件重载（ARIS_LIB_REV），避免 ESM 缓存把 tick 锁在上一次启动的代码。
 const ARIS_LIB_REV = process.env.ARIS_LIB_REV || '49';
-const { costView, effectiveInterval, isRunning, kimiIntervalMinutes, nextKimiTick, nextRunAt, pendingReviews, pendingSubmittedAt, preflight, recoverStale, resetPrompt, runOnce, cancelStopIntent, stopPipeline, tick, todayStats, RUNNER_REV } = await import(`./aris-runner.mjs?v=${ARIS_LIB_REV}`);
+const { executorMode, costView, dshIntervalMinutes, reviewGapMinutes, effectiveInterval, isRunning, kimiIntervalMinutes, nextKimiTick, nextRunAt, pendingReviews, pendingSubmittedAt, preflight, recoverStale, resetPrompt, runOnce, cancelStopIntent, stopPipeline, tick, todayStats, RUNNER_REV } = await import(`./aris-runner.mjs?v=${ARIS_LIB_REV}`);
 import { resolveDsh } from './aris-dsh.mjs?v=46';
-import { CODEX_TASKS, codexState, listModels, normalizeWorkspace, previewPrompt, readCodexConfig, runCodexReview, saveCodexConfig, quotaGate } from './codex-review.mjs?v=7';
-import { readProjectSlots, readReviewRoute, routeBlocks, saveReviewRoute } from './review-route.mjs?v=3';
+import { CODEX_TASKS, codexState, listModels, normalizeWorkspace, previewPrompt, readCodexConfig, runCodexReview, saveCodexConfig, quotaGate, reviewQuotaTasks } from './codex-review.mjs?v=10';
+import { effectiveReviewer, projectNeedsReviewSync, readProjectSlots, readReviewRoute, routeBlocks, saveReviewRoute, syncProjectRoute } from './review-route.mjs?v=5';
+import { chooseRoundTask } from './aris-round-task.mjs?v=1';
+import { physicalUsage, raiseQuota, readReviewBudget, recentDecisions, scopeQuota } from './aris-review-quota.mjs';
+import { inspectReviewLock } from './review-lock.mjs';
 import { collectReviewResults } from './review-results.mjs?v=4';
 import { readSessionTranscript } from './codex-session.mjs';
 
@@ -509,32 +512,25 @@ export function liveSessionId(root) {
 }
 
 /** 设置或执行权变化后立即重算各流水线的 nextAt，避免旧间隔残留。 */
-export function recalcNextAt(workspace, settings, mode) {
-  const registry = readRegistry(workspace);
+export function recalcNextAt(workspace, settings, _legacyMode, registry = readRegistry(workspace)) {
   for (const entry of Array.isArray(registry) ? registry : registry.projects || []) {
     if (!entry || !entry.root) continue;
     const config = readConfig(entry.root);
+    const mode = executorMode(workspace, config);
+    if (mode === 'kimi') continue;
     const runtime = readRuntime(entry.root);
-    const interval = effectiveInterval(config, settings, mode);
+    const interval = mode === 'dsh' ? reviewGapMinutes(workspace, entry.root, config, settings) : effectiveInterval(config, settings, mode);
     const finishedMs = runtime.lastRun && runtime.lastRun.finishedAt ? Date.parse(runtime.lastRun.finishedAt) : 0;
     const pending = pendingReviews(settings, entry.root);
-    // GPT 额度用完时，下一轮要等额度恢复；线路设成 kimi 则不看 GPT 额度。
-    let gate = null;
-    try {
-      if (readReviewRoute(workspace).channel !== 'kimi') gate = quotaGate(workspace, readCodexConfig(workspace));
-    } catch {
-      gate = null;
-    }
-    const blockedUntil = gate && gate.blocked && gate.freeAt ? Date.parse(gate.freeAt) || 0 : 0;
     const nextAt = config.enabled
       ? nextRunAt(settings, mode, Date.now(), {
           pending: pending.length > 0,
           submittedAt: pendingSubmittedAt(pending),
-          blockedUntil,
+          dshMinutes: reviewGapMinutes(workspace, entry.root, config, settings),
         })
       : null;
-    const byInterval = finishedMs && !pending.length ? new Date(Math.max(finishedMs + interval * 60_000, blockedUntil || 0)).toISOString() : nextAt;
-    const basis = !config.enabled ? null : pending.length ? 'mailbox' : gate && gate.blocked ? 'quota' : 'interval';
+    const byInterval = finishedMs && !pending.length ? new Date(finishedMs + interval * 60_000).toISOString() : nextAt;
+    const basis = !config.enabled ? null : pending.length ? 'mailbox' : 'interval';
     saveRuntime(entry.root, {
       nextAt: config.enabled ? (pending.length || Date.parse(byInterval) > Date.now() ? byInterval : nextAt) : null,
       nextAtBasis: basis,
@@ -552,19 +548,20 @@ export function describePipeline(workspace, entry, settings) {
   const driver = pick(entry.driver) || pick(config.driver) || pick(detectedDriver) || 'aris';
   const costs = costView(root);
   const stage = pipelineStage(root, driver);
-  const handoff = readHandoff(workspace);
-  const mode = handoff && handoff.mode === 'kimi' ? 'kimi' : 'dsh';
+  const mode = executorMode(workspace, config);
   const running = isRunning(root) || runtime.status === 'running';
   // 本轮正在跑时，租约就是我们自己持有的，别再拿预检结果当“拦截原因”展示。
   let blocked = '';
   if (!running) {
     try {
-      const pre = preflight(root, config, settings, readHandoff(workspace).mode === 'kimi' ? 'kimi' : 'dsh');
+      const pre = preflight(root, config, settings, mode);
       blocked = pre && pre.ok === false ? String(pre.reason || pre.message || '预检未通过') : '';
     } catch (error) {
       blocked = String(error && error.message ? error.message : error);
     }
   }
+  const reviewer = effectiveReviewer(workspace, root);
+  const selection = mode === 'dsh' ? chooseRoundTask(workspace, root, config) : null;
   const lastRun = costs.last || null;
   const plan = driver === 'frrs' ? frrsPlan(root) : arisPlan(root);
   const pending = pendingReviews(settings, root);
@@ -575,8 +572,36 @@ export function describePipeline(workspace, entry, settings) {
     driver,
     enabled: config.enabled !== false,
     model: config.model || settings.model,
+    reviewer,
+    roundTask: selection?.task,
+    roundBlockedTasks: selection?.blocked || [],
+    reviewQuotaTasks: mode === 'dsh' ? reviewQuotaTasks(workspace, root) : [],
+    physicalQuota: mode === 'dsh' ? (() => {
+      try {
+        const budget = readReviewBudget(root);
+        const usage = physicalUsage(root);
+        const scopes = Object.keys(usage).map((key) => {
+          const [scope, tier] = key.split('\u0000');
+          return scopeQuota(root, scope, tier, budget, usage);
+        }).sort((a, b) => (b.limit > 0 ? b.used / b.limit : 0) - (a.limit > 0 ? a.used / a.limit : 0) || String(a.scope).localeCompare(String(b.scope)));
+        const caps = (selection?.blocked || []).filter((item) => item && item.kind === 'physical-cap');
+        return {
+          defaults: budget.defaults,
+          overrides: budget.overrides,
+          rows: caps,
+          scopes,
+          decisions: recentDecisions(root, 12),
+        };
+      } catch (error) {
+        return { error: String((error && error.message) || error), rows: [], decisions: [] };
+      }
+    })() : null,
     mode,
+    executorSetting: config.executor || 'inherit',
+    kimiPingPong: hasKimiProtocol(root),
     intervalMinutes: effectiveInterval(config, settings, mode),
+    minIntervalMinutes: mode === 'dsh' ? dshIntervalMinutes(config, settings) : null,
+    gapMinutes: mode === 'dsh' ? reviewGapMinutes(workspace, root, config, settings) : null,
     intervalSource: config.intervalSource || 'auto',
     kimiIntervalMinutes: kimiIntervalMinutes(settings),
     maxMinutes: Number(config.maxMinutes || settings.maxMinutes || 45),
@@ -626,34 +651,15 @@ export function describePipeline(workspace, entry, settings) {
     totals: { runs: costs.count, cny: (costs.total && costs.total.cny) || 0, usage: (costs.total && costs.total.usage) || null },
     // 下一轮：runtime 里没有就现算，避免「刚启用 / 刚改设置」时卡片显示空。
     ...(() => {
-      if (config.enabled === false) return { nextAt: null, nextAtBasis: null };
-      // 等额度：runtime 里记的时间会随滚动窗口前移，这里按当前门禁重算，避免显示已过去的时间。
-      if (runtime.nextAtBasis === 'quota') {
-        let g1 = null;
-        try {
-          if (readReviewRoute(workspace).channel !== 'kimi') g1 = quotaGate(workspace, readCodexConfig(workspace));
-        } catch {
-          g1 = null;
-        }
-        if (g1 && g1.blocked && g1.freeAt) return { nextAt: g1.freeAt, nextAtBasis: 'quota', gateFreeAt: g1.freeAt };
-        return { nextAt: nextRunAt(settings, mode, Date.now(), {}), nextAtBasis: 'interval' };
-      }
-      if (runtime.nextAt) return { nextAt: runtime.nextAt, nextAtBasis: runtime.nextAtBasis || 'interval' };
+      if (mode === 'kimi' || config.enabled === false) return { nextAt: null, nextAtBasis: null };
+      if (runtime.nextAt && !/^quota/.test(runtime.nextAtBasis || '')) return { nextAt: runtime.nextAt, nextAtBasis: runtime.nextAtBasis || 'interval' };
       if (pending.length) {
         return {
           nextAt: nextRunAt(settings, mode, Date.now(), { pending: true, submittedAt: pendingSubmittedAt(pending) }),
           nextAtBasis: 'mailbox',
         };
       }
-      let gate = null;
-      try {
-        if (readReviewRoute(workspace).channel !== 'kimi') gate = quotaGate(workspace, readCodexConfig(workspace));
-      } catch {
-        gate = null;
-      }
-      const blockedUntil = gate && gate.blocked && gate.freeAt ? Date.parse(gate.freeAt) || 0 : 0;
-      const at = nextRunAt(settings, mode, Date.now(), { blockedUntil });
-      return { nextAt: at, nextAtBasis: gate && gate.blocked ? (gate.freeAt ? 'quota' : 'quota-stuck') : 'interval' };
+      return { nextAt: nextRunAt(settings, mode, Date.now(), { dshMinutes: dshIntervalMinutes(config, settings) }), nextAtBasis: 'interval' };
     })(),
     consecutiveErrors: runtime.consecutiveErrors || 0,
     lastError: runtime.lastError || null,
@@ -666,7 +672,7 @@ export function describePipeline(workspace, entry, settings) {
       if (String(stage && stage.status) === 'blocked_on_user') out.push({ severity: 'warn', kind: 'blocked-on-user', text: '等待人工裁决', evidence: 'state.json 标记 blocked_on_user', human: true, action: { kind: 'open-log', label: '看日志' } });
       if (blocked) out.push({ severity: 'warn', kind: 'preflight', text: blocked, evidence: '运行前预检未通过', human: false });
       if (running && Boolean(runtime.stopping)) out.push({ severity: 'info', kind: 'stopping', text: '已登记停止，本轮结束后停下', evidence: 'runtime.stopRequestedAt', human: false });
-      if (pending.length) out.push({ severity: 'info', kind: 'review-pending', text: pending.length + ' 轮还没送审', evidence: pending.map((x) => x.base).slice(0, 3).join('、'), human: false });
+      if (pending.length) out.push({ severity: 'info', kind: 'review-pending', text: pending.length + ' 份审稿在途', evidence: pending.map((x) => x.base).slice(0, 3).join('、'), human: false });
       if (runtime.lastError) out.push({ severity: 'warn', kind: 'error', text: String(runtime.lastError).slice(0, 160), evidence: 'runtime.lastError', human: false });
       return out;
     })(),
@@ -789,7 +795,7 @@ function collectSendFiles(root, list) {
 
 function startCodexRun(workspace, input) {
   if (codexManual.running) return { ok: false, error: '已有一次手动外审在跑，等它结束' };
-  const routeBlocked = routeBlocks(workspace, 'gpt');
+  const routeBlocked = routeBlocks(workspace, 'gpt', input.root);
   if (routeBlocked) return { ok: false, blocked: true, error: routeBlocked };
   const taskKey = String(input.task || input.taskKey || input.gate || 'routine_review');
   const root = path.resolve(String(input.root || ''));
@@ -933,29 +939,6 @@ function require_verdict(text) {
   return m ? m[1].toLowerCase() : 'unknown';
 }
 
-/** 正在跑的流水线名字（切换审核线路前用它拦一下）。 */
-function runningPipelineNames(workspace, config) {
-  try {
-    const settings = readSettings(workspace, config);
-    const registry = readRegistry(workspace);
-    const entries = (Array.isArray(registry) ? registry : registry.projects || [])
-      .filter((e) => e && e.root && existsDir(e.root))
-      .map((e) => ({ ...e, driver: e.driver === 'auto' ? (detectDriver(e.root).driver || 'auto') : e.driver }))
-      .filter((e) => e.driver === 'frrs' || e.driver === 'aris');
-    return entries
-      .filter((e) => {
-        try {
-          return describePipeline(workspace, e, settings).running;
-        } catch {
-          return false;
-        }
-      })
-      .map((e) => e.name || path.basename(e.root));
-  } catch {
-    return [];
-  }
-}
-
 export function snapshot(workspace, config = {}) {
   const settings = readSettings(workspace, config);
   const registry = readRegistry(workspace);
@@ -1079,6 +1062,59 @@ function driverNameOf(entry, root) {
   return (det && det.driver) || 'aris';
 }
 
+function hasKimiProtocol(root) {
+  return ['gate.py', 'automation_prompt_template.md', 'review/run_review.sh']
+    .every(file => fs.existsSync(path.join(root, 'pipeline', file)));
+}
+
+function roleChangeBlock(workspace, root, settings) {
+  if (isRunning(root)) return '请等当前执行轮次结束后再切换';
+  if (pendingReviews(settings, root).length) return '请先收取该项目在途的审稿回件';
+  const lock = inspectReviewLock(workspace);
+  if (lock.locked && !lock.expired) return '审稿通道正在使用，请在回件后切换';
+  const stateFile = path.join(root, 'pipeline', 'state.json');
+  if (fs.existsSync(stateFile)) {
+    const state = readJsonSafe(stateFile, null);
+    if (!state) return '无法核对项目租约，请先检查状态文件';
+    const chain = state.chain || {};
+    const fresh = (ts, ms) => ts && (!Number.isFinite(Date.parse(ts)) || Date.now() - Date.parse(ts) < ms);
+    if (fresh(chain.wake_start, 70 * 60_000) || (chain.relay_to && fresh(chain.relay_ts, 10 * 60_000))) {
+      return 'Kimi A/B 租约或接力仍在有效期内';
+    }
+  }
+  return '';
+}
+
+// Report the new child even if a short run finishes between dashboard polls.
+function startPanelRun(workspace, root, settings, hooks, restoreBlock) {
+  return new Promise(resolve => {
+    let spawned = false;
+    function fail(message) {
+      if (spawned) return;
+      try {
+        restoreBlock?.();
+      } catch (error) {
+        message += '；恢复裁决窗口失败：' + error.message;
+      }
+      resolve({ ok: false, started: false, error: message });
+    }
+    runOnce({
+      workspace, root, settings, hooks,
+      onSpawn(info) {
+        spawned = true;
+        resolve({ ok: true, started: true, ...info });
+      },
+    }).then(result => fail(result.summary || '未能启动执行进程'), error => {
+      let message = String(error);
+      try { saveRuntime(root, { lastError: message, status: 'error', pid: null }); }
+      catch (writeError) { message += '；记录启动错误失败：' + writeError.message; }
+      fail(message);
+    }).finally(() => {
+      try { hooks?.onEnd?.({ root }); } catch { /* Optional host hook. */ }
+    });
+  });
+}
+
 export async function control(workspace, name, input = {}, config = {}) {
   const settings = readSettings(workspace, config);
   switch (name) {
@@ -1126,7 +1162,7 @@ export async function control(workspace, name, input = {}, config = {}) {
       saveConfig(root, patch);
       // 启用后立刻排一次下一轮，否则卡片会一直显示「无下次时间」。
       try {
-        recalcNextAt(workspace, readSettings(workspace), readHandoff(workspace).mode === 'kimi' ? 'kimi' : 'dsh');
+        recalcNextAt(workspace, settings, undefined, [{ root }]);
       } catch {
         /* 排期失败不影响启用 */
       }
@@ -1155,39 +1191,11 @@ export async function control(workspace, name, input = {}, config = {}) {
     case 'run': {
       const root = resolveRoot(workspace, input);
       const config = readConfig(root);
+      if (executorMode(workspace, config) === 'kimi') return { ok: false, error: '执行权在 Kimi A/B' };
       if (isRunning(root)) return { ok: true, started: false, reason: '本轮进行中' };
-      // 已 blocked_on_user 时不许静默起一轮空跑（那种轮次只会打印 RESULT: blocked 然后花掉一次模型调用）。
-      if (!input.force) {
-        try {
-          const st = JSON.parse(fs.readFileSync(path.join(root, 'pipeline', 'state.json'), 'utf8'));
-          if (String(st.status || '') === 'blocked_on_user') {
-            return { ok: false, started: false, reason: '当前为 blocked_on_user，需人工裁决；要强制起轮请带 force' };
-          }
-        } catch { /* 读不到状态就交给运行时预检 */ }
-      }
-      // 后台起跑，但要等 pid 落盘再返回：立刻返回会让卡片停在旧状态，
-      // 失败也只落在 lastError 里，用户看到「已点但没反应」。
-      let failure = null;
-      const hooks = input.hooks && typeof input.hooks === 'object' ? input.hooks : null;
-      const job = runOnce({ workspace, root, config, settings, hooks });
-      job
-        .catch((err) => {
-          failure = err;
-          try { saveRuntime(root, { lastError: String((err && err.message) || err).slice(0, 300), status: 'error', pid: null }); } catch {}
-        })
-        .finally(() => {
-          if (hooks && typeof hooks.onEnd === 'function') {
-            try { hooks.onEnd({ root }); } catch {}
-          }
-        });
-      const deadline = Date.now() + 8000;
-      let rt = readRuntime(root);
-      while (Date.now() < deadline && !rt.pid && !failure) {
-        await new Promise((r) => setTimeout(r, 200));
-        rt = readRuntime(root);
-      }
-      if (failure) return { ok: false, started: false, error: String((failure && failure.message) || failure) };
-      return { ok: true, started: Boolean(rt.pid), pid: rt.pid || null, runId: rt.runId || null };
+      const gate = preflight(root, config, settings);
+      if (!gate.ok && !input.force) return { ok: false, started: false, error: gate.reason };
+      return startPanelRun(workspace, root, settings, input.hooks);
     }
     case 'tick': {
       const results = await tick(workspace, { force: Boolean(input.force), hooks: input.hooks || null });
@@ -1273,27 +1281,17 @@ export async function control(workspace, name, input = {}, config = {}) {
     case 'review.route': {
       const want = String((input || {}).channel || '').trim();
       const current = readReviewRoute(workspace);
-      if (want && want !== current.channel) {
-        const running = runningPipelineNames(workspace, config);
-        if (running.length) {
-          return {
-            ok: false,
-            blocked: true,
-            error: `流水线「${running.join('、')}」正在运行，运行期间不允许切换审核线路——跑到一半换通道会让同一轮出现两种审稿人。等这一轮结束再改。`,
-            route: current,
-            dashboard: snapshot(workspace, config),
-          };
-        }
+      if (!current.options.some(option => option.value === want)) return { ok: false, error: '未知审核通道' };
+      const projects = readRegistry(workspace);
+      const changing = want !== current.channel;
+      const affected = changing ? projects : projects.filter(project => projectNeedsReviewSync(project.root, want));
+      if ((changing || affected.length) && inspectReviewLock(workspace).locked) {
+        return { ok: false, blocked: true, route: current, error: '审稿通道正在使用，请在回件后切换' };
       }
-      // 面板是唯一入口：同时改 DSH 设置与每个项目的 reviewer.json（双槽保留）。
-      const projects = (() => {
-        try {
-          const reg = readRegistry(workspace);
-          return (Array.isArray(reg) ? reg : reg.projects || []).map((e) => ({ root: e && e.root, name: (e && (e.name || e.label)) || '' })).filter((x) => x.root);
-        } catch {
-          return [];
-        }
-      })();
+      for (const project of affected) {
+        const reason = roleChangeBlock(workspace, project.root, settings);
+        if (reason) return { ok: false, blocked: true, route: current, error: project.name + '：' + reason };
+      }
       const saved = saveReviewRoute(workspace, want, projects);
       const bad = (saved.projects || []).filter((x) => x && x.ok === false);
       return {
@@ -1314,16 +1312,47 @@ export async function control(workspace, name, input = {}, config = {}) {
       const t = readSessionTranscript(sid, { maxTurns: (input || {}).maxTurns });
       return t.ok ? { ok: true, session: t } : { ok: false, error: t.error || '读取会话失败' };
     }
+    case 'project.roles': {
+      const root = resolveRoot(workspace, input);
+      const entry = readRegistry(workspace).find(e => path.relative(e.root, root) === '');
+      if (!entry) return { ok: false, error: '请选择已登记的流水线' };
+      const { executor, reviewer } = input;
+      if ((executor == null) === (reviewer == null)) return { ok: false, error: '每次请选择一个角色' };
+      const cfg = readConfig(root);
+      const block = roleChangeBlock(workspace, root, settings);
+      if (block) return { ok: false, error: block };
+      if (executor != null) {
+        if (!['inherit', 'dsh', 'kimi'].includes(executor)) return { ok: false, error: '未知执行者' };
+        const next = executorMode(workspace, { executor });
+        if (next === 'kimi' && !hasKimiProtocol(root)) return { ok: false, error: '项目缺少 Kimi A/B 乒乓协议文件' };
+        if (next !== executorMode(workspace, cfg) && input.confirmHandoff !== true) {
+          return { ok: false, error: '请确认目标项目外部 A/B 任务的交接状态' };
+        }
+        saveConfig(root, { executor });
+        recalcNextAt(workspace, settings, undefined, [entry]);
+      } else {
+        if (!['kimi', 'gpt'].includes(reviewer)) return { ok: false, error: '未知审稿通道' };
+        if (executorMode(workspace, cfg) === 'kimi') return { ok: false, error: 'Kimi A/B 使用项目的 DeepSeek 审稿脚本' };
+        if (readReviewRoute(workspace).channel !== 'auto') return { ok: false, error: '请先将工作区审稿线路切到自动（跟随项目）' };
+        const result = syncProjectRoute(root, reviewer, entry.name, { projectOverride: true });
+        if (!result.ok || result.skipped) return { ok: false, error: result.reason || '项目审稿设置未保存' };
+      }
+      return { ok: true };
+    }
     case 'handoff.set': {
       const mode = String(input.mode || '') === 'kimi' ? 'kimi' : 'dsh';
-      if (mode === 'kimi') {
-        const registry = readRegistry(workspace);
-        for (const entry of Array.isArray(registry) ? registry : registry.projects || []) {
-          if (entry && entry.root) stopPipeline(entry.root, { force: true });
-        }
+      if (!['dsh', 'kimi'].includes(input.mode)) return { ok: false, error: '未知执行者' };
+      const previous = readHandoff(workspace);
+      if (mode === previous.mode) return { ok: true, handoff: previous };
+      if (input.confirmHandoff !== true) return { ok: false, error: '请先确认外部 A/B 任务交接' };
+      const inherited = readRegistry(workspace).filter(entry => !['dsh', 'kimi'].includes(readConfig(entry.root).executor));
+      for (const entry of inherited) {
+        if (mode === 'kimi' && !hasKimiProtocol(entry.root)) return { ok: false, error: entry.name + ' 缺少 Kimi A/B 协议文件' };
+        const block = roleChangeBlock(workspace, entry.root, settings);
+        if (block) return { ok: false, error: entry.name + '：' + block };
       }
       const handoff = writeHandoff(workspace, { mode, note: String(input.note || '') });
-      recalcNextAt(workspace, readSettings(workspace, config), mode);
+      recalcNextAt(workspace, settings, undefined, inherited);
       return { ok: true, handoff };
     }
     case 'balance.check': {
@@ -1356,11 +1385,107 @@ export async function control(workspace, name, input = {}, config = {}) {
       const config = saveConfig(root, { limits: patch });
       return { ok: true, limits: config.limits };
     }
+    case 'pipeline.settings.save': {
+      // 面板「流水线运行设置」：一次保存多项目的运行参数，改完立即重排下一轮。
+      const rows = Array.isArray(input.rows) ? input.rows : [];
+      if (!rows.length) return { ok: false, error: '没有要保存的流水线' };
+      const touched = [];
+      const warnings = [];
+      for (const row of rows) {
+        const root = resolveRoot(workspace, { root: row && row.root });
+        const label = path.basename(root);
+        const before = readConfig(root);
+        const patch = {};
+        if (row.minIntervalMinutes != null && row.minIntervalMinutes !== '') {
+          const n = Number(row.minIntervalMinutes);
+          if (!Number.isFinite(n) || n < 0 || n > 240) return { ok: false, error: label + '：最小间隔要在 0–240 分钟之间' };
+          patch.minIntervalMinutes = n;
+        }
+        if (row.intervalMinutes != null && row.intervalMinutes !== '') {
+          const n = Number(row.intervalMinutes);
+          if (!Number.isFinite(n) || n < 0 || n > 1440) return { ok: false, error: label + '：间隔要在 0–1440 分钟之间' };
+          patch.intervalMinutes = n;
+          patch.intervalSource = n > 0 ? 'manual' : 'auto';
+        }
+        if (row.maxMinutes != null && row.maxMinutes !== '') {
+          const n = Number(row.maxMinutes);
+          if (!Number.isFinite(n) || n < 5 || n > 240) return { ok: false, error: label + '：单轮上限要在 5–240 分钟之间' };
+          patch.maxMinutes = n;
+        }
+        const limits = {};
+        if (row.dailyRuns != null && row.dailyRuns !== '') {
+          const n = Number(row.dailyRuns);
+          if (!Number.isFinite(n) || n < 0) return { ok: false, error: label + '：日轮次不能为负' };
+          limits.dailyRuns = n;
+        }
+        if (row.dailyCny != null && row.dailyCny !== '') {
+          const n = Number(row.dailyCny);
+          if (!Number.isFinite(n) || n < 0) return { ok: false, error: label + '：日金额不能为负' };
+          limits.dailyCny = n;
+        }
+        if (Object.keys(patch).length) saveConfig(root, patch);
+        if (Object.keys(limits).length) saveConfig(root, { limits });
+        if (row.enabled != null && Boolean(row.enabled) !== (before.enabled !== false)) {
+          try {
+            const res = await control(workspace, row.enabled ? 'start' : 'stop', { root });
+            if (res && (res.ok === false || res.started === false)) {
+              warnings.push(label + '：已保存设置，但没有启动 —— ' + (res.error || res.reason || res.summary || '预检未通过'));
+            }
+          } catch (error) {
+            warnings.push(label + '：已保存设置，但启停失败 —— ' + (error && error.message ? error.message : error));
+          }
+        }
+        touched.push({ root });
+      }
+      try {
+        recalcNextAt(workspace, settings, undefined, touched);
+      } catch {
+        /* 重排失败不影响保存 */
+      }
+      return {
+        ok: true,
+        warnings,
+        saved: touched.map((t) => ({ root: t.root, config: readConfig(t.root) })),
+      };
+    }
+    case 'quota.raise': {
+      // 面板逐行追加物理送审额度：只写 pipeline/budget.json 与审计，不清 block、不起轮。
+      const root = resolveRoot(workspace, input);
+      const raw = Array.isArray(input.rows) ? input.rows : [input];
+      const rows = raw
+        .filter((row) => row && row.scope && (row.add != null || row.target != null))
+        .map((row) => ({
+          scope: String(row.scope),
+          tier: row.tier === 'fast' ? 'fast' : 'review',
+          add: row.add != null ? Number(row.add) : undefined,
+          target: row.target != null ? Number(row.target) : undefined,
+        }));
+      if (!rows.length) return { ok: false, error: '没有要追加的 scope' };
+      const directiveId = String(input.directiveId || '').trim() || `panel-${root}-${new Date().toISOString().slice(0, 16)}`;
+      const result = raiseQuota(root, rows, { by: 'panel', directiveId });
+      if (!result.ok) return { ok: false, error: result.error };
+      const entry = findPipeline(workspace, root);
+      return {
+        ok: true,
+        changed: result.changed,
+        decisions: result.decisions,
+        pipeline: entry ? describePipeline(workspace, entry, settings) : null,
+      };
+    }
     case 'human.reply': {
       // 人工介入：把回复写成文件交给下一轮，可选立刻解除阻塞并重启。
       const root = resolveRoot(workspace, input);
       const text = String(input.text || '').trim();
       if (!text) throw new Error('回复内容为空');
+      if (input.restart && executorMode(workspace, readConfig(root)) === 'kimi') {
+        return { ok: false, error: '执行权在 Kimi A/B。可只留备注，或完成人工交接后再由 DSH 重启' };
+      }
+      if (input.restart) {
+        const check = preflight(root, readConfig(root), settings, 'dsh', { approved: true });
+        if (!check.ok) return { ok: false, error: check.reason };
+        const selection = chooseRoundTask(workspace, root);
+        if (!selection.ok) return { ok: false, error: selection.reason, blockedTasks: selection.blocked };
+      }
       fs.mkdirSync(runDir(root), { recursive: true });
       const file = path.join(runDir(root), 'human-note.md');
       const at = new Date().toISOString();
@@ -1372,6 +1497,7 @@ ${text}
 ` + prev;
       fs.writeFileSync(file, next, 'utf8');
       let resumed = null;
+      let restoreBlock;
       if (input.restart) {
         const entry = findPipeline(workspace, root);
         const driver = entry.driver && entry.driver !== 'auto' ? entry.driver : detectDriver(root).driver || 'aris';
@@ -1379,12 +1505,13 @@ ${text}
           const stateFile = path.join(root, 'pipeline', 'state.json');
           const state = readJsonSafe(stateFile, null);
           if (state) {
+            const previous = { status: state.status, block: state.block };
             const before = { status: state.status, block: state.block ? state.block.id || 'block' : null };
             state.status = 'running';
             state.block = null;
             if (!Array.isArray(state.user_directives)) state.user_directives = [];
             state.user_directives.push({
-              id: 'dir-' + at.slice(0, 10).replace(/-/g, '') + '-human-reply',
+              id: 'dir-' + at + '-human-reply',
               ts: at,
               by: 'dsh-panel-human',
               text: text.slice(0, 500),
@@ -1392,29 +1519,20 @@ ${text}
               done: null,
             });
             writeJsonAtomic(stateFile, state);
+            restoreBlock = () => {
+              const current = readJsonSafe(stateFile, null);
+              if (current?.status === 'running' && !current.block && current.user_directives?.at(-1)?.ts === at) {
+                Object.assign(current, previous);
+                writeJsonAtomic(stateFile, current);
+              }
+            };
             resumed = { before, after: { status: state.status, block: null } };
           }
         }
         saveConfig(root, { enabled: true });
-        // 「批准并重启」要立刻起一轮，而不是等下一次节拍（间隔可能 30 分钟）。
-        try {
-          if (isRunning(root)) {
-            resumed = { ...(resumed || {}), started: false, reason: '本轮进行中' };
-          } else {
-            const cfg2 = readConfig(root);
-            const job = runOnce({ workspace, root, config: cfg2, settings, hooks: null });
-            job.catch(() => {});
-            const deadline = Date.now() + 8000;
-            let rt = readRuntime(root);
-            while (Date.now() < deadline && !(rt && rt.pid)) {
-              await new Promise((r) => setTimeout(r, 200));
-              rt = readRuntime(root);
-            }
-            resumed = { ...(resumed || {}), started: Boolean(rt && rt.pid), runId: (rt && rt.runId) || null };
-          }
-        } catch (error) {
-          resumed = { ...(resumed || {}), started: false, error: String((error && error.message) || error) };
-        }
+        const launch = await startPanelRun(workspace, root, settings, input.hooks, restoreBlock);
+        if (!launch.ok) return { ...launch, file };
+        resumed = { ...resumed, ...launch };
       }
       return { ok: true, file, resumed };
     }
