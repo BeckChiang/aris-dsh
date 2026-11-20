@@ -1,5 +1,5 @@
 /** 运行时版本标记：面板会回显它，用来确认插件宿主加载的是不是最新模块（改完必须升这里 + aris-control 的 ?v=）。 */
-export const RUNNER_REV = 50;
+export const RUNNER_REV = 51;
 // 流水线运行器：为每条流水线起一次 dsh headless，记账、落日志、排下一次。
 //
 // 设计要点：

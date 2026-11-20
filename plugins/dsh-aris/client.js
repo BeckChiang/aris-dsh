@@ -1629,6 +1629,54 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
           h('span', null, '共 ', h('b', null, String(n)), ' 轮')));
     }
 
+    function latestPipelineReview(pipeline, groups) {
+      const at = review => Number(review.atMs) || Date.parse(review.at) || 0;
+      let group = null;
+      for (const candidate of groups) {
+        if (!candidate.latest) continue;
+        const root = candidate.latest.root || candidate.root;
+        if (root ? root !== pipeline.root : candidate.name !== pipeline.name) continue;
+        if (!group || at(candidate.latest) > at(group.latest)) group = candidate;
+      }
+      const fallback = pipeline.lastReview;
+      if (fallback && (!group || at(fallback) > at(group.latest))) {
+        return { review: fallback, must: Array.isArray(fallback.must) ? fallback.must.length : fallback.must, should: fallback.should };
+      }
+      if (!group) return null;
+      const review = group.latest;
+      const counted = review.verdict === 'revise' || review.verdict === 'reject';
+      return {
+        review,
+        scope: group.scope,
+        must: counted ? group.mustCount : null,
+        should: counted ? group.shouldCount : null,
+        mustItems: group.must,
+      };
+    }
+
+    function LatestReview({ result }) {
+      if (!result) return h('div', { className: 'daris2-empty' }, '暂无审核回件');
+      const { review, scope, must, should, mustItems } = result;
+      const verdict = String(review.verdict || '').toLowerCase();
+      const metrics = [
+        ['MUST', must, ' 条'],
+        ['SHOULD', should, ' 条'],
+        ['评分', review.score, '/10'],
+      ];
+      return h('div', null,
+        h('div', { className: 'daris2-cell2' },
+          h('strong', null, VERD_LABEL[verdict] || review.verdict || '结论未知'),
+          h('span', { className: 's' }, [review.scope || scope, review.round ? '第 ' + review.round + ' 轮' : '', CH_LABEL[review.channel] || review.channel, review.at && ft(review.at)].filter(Boolean).join(' · '))),
+        h('div', { className: 'daris2-kpis', style: { gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' } },
+          metrics.map(([label, value, unit]) => h('div', { key: label, className: 'daris2-kpi' },
+            h('div', { className: 'daris2-kpi-k' }, label),
+            h('div', { className: 'daris2-kpi-v' }, value ?? '—',
+              value != null && h('span', { className: 'daris2-kpi-u' }, unit))))),
+        mustItems && mustItems.length > 0 && h('ul', { className: 'daris-err-list' },
+          mustItems.map((item, index) => h('li', { key: index }, item))),
+        review.summary && h('div', { className: 'daris2-note' }, review.summary));
+    }
+
     function PieBox(props) {
       const segs = (props.segs || []).filter((x) => (x.value || 0) > 0);
       if (!segs.length) return h('div', { className:'daris2-empty' }, '暂无记录');
@@ -2057,12 +2105,7 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
         const today = p.today || { runs: 0, cny: 0 };
         const vt = (v) => ({ accept: '通过', pass: '通过', done: '完成', revise: '需修改', partial: '部分完成', blocked: '阻塞', error: '出错', running: '运行中' }[v] || (v ? String(v) : '—'));
         const sv = (v) => (v === 'accept' || v === 'pass' || v === 'done' ? 'ok' : v === 'revise' || v === 'partial' ? 'warn' : v === 'running' ? 'run' : v === 'blocked' || v === 'error' ? 'err' : '');
-        const pieSegs = (() => {
-          const c = {};
-          (p.history || []).slice(0, 6).forEach((x) => { const key = x.verdict || '未知'; c[key] = (c[key] || 0) + 1; });
-          const color = { done: '#18794e', partial: '#b45309', blocked: '#b42318', error: '#b42318', running: '#2563eb' };
-          return Object.keys(c).map((key) => ({ label: vt(key), value: c[key], color: color[key] || '#8a8a8a' }));
-        })();
+        const latestReview = latestPipelineReview(p, rvGroups);
         const interval = p.intervalMinutes ? '每 ' + p.intervalMinutes + ' 分钟' : '';
         return h('div', { className: 'daris2-detail' },
           h('div', { className: 'daris2-pipehead' },
@@ -2143,9 +2186,9 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
                         h('td', null, h('span', { className: 'daris2-verdict ' + sv(x.verdict) }, vt(x.verdict))),
                         h('td', { className: 'num' }, x.exit != null ? String(x.exit) : '—')))))))),
               h('div', { className: 'daris2-colside' },
-                foldTools('阶段与结论',setSideFold),
-                h(Pane, { force:sideFold, title: '结论分布', meta: ['最近 6 轮', mustLine(p.name)].filter(Boolean).join(' · '), defaultOpen: true },
-                  h(PieBox, { segs: pieSegs })),
+                foldTools('阶段与审核',setSideFold),
+                h(Pane, { force:sideFold, title: '最新审核回件', defaultOpen: true },
+                  h(LatestReview, { result: latestReview })),
                 h(Pane, { force:sideFold, title: '阶段树', meta: treeStages.length + ' 个阶段 · 展开查看子项', defaultOpen: true },
                   h(StageTree, { key: p.root || p.name, stages: treeStages, force: sideFold }),
                 ),
@@ -2467,7 +2510,7 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
           ovView === 'card'
             ? h('div', { className: 'daris-blocks' }, rows.map(card))
             : h('div', null, pipeTable(rows, ovOpen, setOvOpen),
-              detail ? pipeDetail(detail) : h('div', { className: 'daris2-detail-empty' }, '点一行展开详情：正在做什么 / 计划与阶段树 / 运行数据 / 每轮指标 / 结论分布 / 操作分级。')));
+              detail ? pipeDetail(detail) : h('div', { className: 'daris2-detail-empty' }, '点一行展开详情：正在做什么 / 计划与阶段树 / 运行数据 / 每轮指标 / 最新审核回件 / 操作分级。')));
       } else if (tab === 'pipes') {
         const humanList = humanAll;
         const q = pQuery.trim().toLowerCase();
