@@ -2279,7 +2279,9 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
         const planDoneCount = treeStages.reduce((count, stage) => count + (stage.doneTotal || (stage.doneItems || []).length), 0);
         const activity = p.activity || null;
         const last = p.lastRun || null;
-        const hist = (p.history || []).slice().reverse();
+        // 后端 costView 的 runs 已经是「最新在前」（tail.slice(-20).reverse()），这里不能再翻一次。
+        const hist = (p.history || []).slice();
+        const chartRows = hist.slice(0, 24).reverse();
         const gates = p.gates || { done: 0, total: 0 };
         const today = p.today || { runs: 0, cny: 0 };
         const vt = (v) => ({ accept: '通过', pass: '通过', done: '完成', revise: '需修改', partial: '部分完成', blocked: '阻塞', error: '出错', running: '运行中' }[v] || (v ? String(v) : '—'));
@@ -2317,7 +2319,7 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
                 h(Pane, { force:mainFold, title: '每轮指标', meta: '最近 ' + Math.min(hist.length, 24) + ' 轮 · 成本 / 步数 / 耗时', defaultOpen: false },
                   h(BarChart, {
                     height: 150,
-                    data: hist.slice(-24).map((x) => ({ label: '', cny: x.cny, steps: x.steps, ms: x.ms, verdict: x.verdict })),
+                    data: chartRows.map((x) => ({ label: '', cny: x.cny, steps: x.steps, ms: x.ms, verdict: x.verdict })),
                   })),
                 h(Pane, { force:mainFold, title: '现在', meta: activity && activity.step ? '第 ' + activity.step + ' 步' : (p.running ? '运行中' : ''), defaultOpen: true },
                   h('div', { className: 'daris2-note', style: { marginTop: 0, maxHeight: 140 } },
@@ -2377,7 +2379,7 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
                         h('th', null, '结论'),
                         h('th', { className: 'num' }, '退出码'))),
                       h('tbody', null, hist.slice(0, 20).map((x, i) => h('tr', { key: i },
-                        h('td', null, '#' + (hist.length - i)),
+                        h('td', null, '#' + Math.max(1, ((p.totals && p.totals.runs) || hist.length) - i)),
                         h('td', null, x.at ? ft(x.at) : '—'),
                         h('td', { className: 'num' }, x.steps != null ? String(x.steps) : '—'),
                         h('td', { className: 'num' }, x.cny != null ? yu(x.cny) : '—'),
