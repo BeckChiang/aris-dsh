@@ -1,5 +1,5 @@
 /** 运行时版本标记：面板会回显它，用来确认插件宿主加载的是不是最新模块（改完必须升这里 + aris-control 的 ?v=）。 */
-export const RUNNER_REV = 49;
+export const RUNNER_REV = 50;
 // 流水线运行器：为每条流水线起一次 dsh headless，记账、落日志、排下一次。
 //
 // 设计要点：
@@ -239,6 +239,12 @@ export function releaseLeaseIfHeld(root, config = {}, { startedAt = 0, pending =
   }
 }
 
+/** 整份读一个 JSON；读不到/解析不了直接抛错，由调用方决定降级策略。 */
+function readJsonFull(file) {
+  const text = fs.readFileSync(file, 'utf8');
+  return JSON.parse(text);
+}
+
 /** 唤醒时的门禁：只读，不改任何状态。返回 {ok, reason}。 */
 export function preflight(root, config = readConfig(root), settings = {}, mode = 'dsh') {
   // 本轮就在跑（租约是我们自己持的），不是“被别的执行者挡住”。
@@ -263,9 +269,16 @@ export function preflight(root, config = readConfig(root), settings = {}, mode =
   }
   if (driver === 'frrs') {
     const stateFile = path.join(root, config.frrs.state || 'pipeline/state.json');
-    let st = {};
-    try { st = JSON.parse(readText(stateFile) || '{}'); } catch { st = {}; }
-    const status = String(st.status || '');
+    let st = null;
+    try { st = readJsonFull(stateFile); } catch (error) {
+      return {
+        ok: false,
+        reason: `状态文件读取失败（${path.basename(stateFile)}）：${String((error && error.message) || error).slice(0, 120)}`,
+        driver,
+        retryAfterMs: 5 * 60_000,
+      };
+    }
+    const status = String((st && st.status) || '');
     if (status === 'paused') return { ok: false, reason: '流水线处于 paused', driver, retryAfterMs: 5 * 60_000 };
     if (status === 'blocked_on_user') return { ok: false, reason: '等待人工处理（blocked_on_user）', driver, retryAfterMs: 10 * 60_000 };
     if (String(st.state || '') === 'done') return { ok: false, reason: '流水线已到 done', driver };
@@ -298,7 +311,14 @@ export function preflight(root, config = readConfig(root), settings = {}, mode =
     return { ok: true, driver, mode, pending: 0 };
   }
   let ast = {};
-  try { ast = JSON.parse(readText(path.join(root, config.aris.stateDir || '.aris', 'state.json')) || '{}'); } catch { ast = {}; }
+  try { ast = readJsonFull(path.join(root, config.aris.stateDir || '.aris', 'state.json')); } catch (error) {
+    return {
+      ok: false,
+      reason: `状态文件读取失败（.aris/state.json）：${String((error && error.message) || error).slice(0, 120)}`,
+      driver,
+      retryAfterMs: 5 * 60_000,
+    };
+  }
   if (String(ast.phase || '') === 'done') return { ok: false, reason: 'ARIS 已到 done', driver };
   const apend = pendingReviews(settings, root);
   if (apend.length) {

@@ -686,6 +686,7 @@ GPT 通道（`via: codex`）的数据流：
 - **GPT 送审失败后邮箱没有请求**：这是设计如此——GPT 通道失败直接退出、不降级，修好额度/线路后重跑同一命令即可
 - **调度器（`aris-runner.mjs`）特别说明**：2026-11-19 起它的 import 版本串跟随插件重载（`ARIS_LIB_REV`，由 `plugins/dsh-aris/index.js` 在每次 `lib()` 时写入），不再需要手动升 `?v=N`；其它 `lib/*.mjs` 仍要升版本号。
 - **改完调度器代码后**：`plugin_manager set_plugin include:aris` 关→开即可生效，不必重启 DSH；若快照的 `runnerRev` 没变，说明重载没走到。
+- **`state.json` 超过 400 KB 时**：`readText()` 默认截断 400,000 B，截断后 JSON 解析失败曾被当成「没有状态」，导致 `preflight()` 放行、每 60 秒空起一轮（2026-11-20 实测 6 分钟 6 轮、约 ¥0.49）。`preflight()` 现已改用 `readJsonFull()` 整份读，解析失败按「状态不可判定」停跑 5 分钟；`done` 只增不删是根因，定期归档可缓解。
 - **改了 `bin/lib/*.mjs` 面板行为没变**：插件宿主按 URL 缓存模块，`lib` 之间互相 `import` 也要带版本号（如 `from './review-route.mjs?v=3'`），改完必须升版本再 `plugin_manager set_plugin include:aris` 关掉再开；只重启插件不升版本会继续跑旧代码（踩过：`readProjectSlots is not defined`）
 - **线路卡上的项目标签是琥珀色**：说明该项目 `reviewer.json` 的 `active` 还没跟上面板；点一次线路按钮即可同步（保存会逐个项目写入并回读）
 
