@@ -1153,6 +1153,15 @@ export async function control(workspace, name, input = {}, config = {}) {
       const root = resolveRoot(workspace, input);
       const config = readConfig(root);
       if (isRunning(root)) return { ok: true, started: false, reason: '本轮进行中' };
+      // 已 blocked_on_user 时不许静默起一轮空跑（那种轮次只会打印 RESULT: blocked 然后花掉一次模型调用）。
+      if (!input.force) {
+        try {
+          const st = JSON.parse(fs.readFileSync(path.join(root, 'pipeline', 'state.json'), 'utf8'));
+          if (String(st.status || '') === 'blocked_on_user') {
+            return { ok: false, started: false, reason: '当前为 blocked_on_user，需人工裁决；要强制起轮请带 force' };
+          }
+        } catch { /* 读不到状态就交给运行时预检 */ }
+      }
       // 后台起跑，但要等 pid 落盘再返回：立刻返回会让卡片停在旧状态，
       // 失败也只落在 lastError 里，用户看到「已点但没反应」。
       let failure = null;

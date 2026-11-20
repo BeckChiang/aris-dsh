@@ -1944,9 +1944,12 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
         const blkText = String((p.plan && p.plan.block && p.plan.block.reason) || '');
         const hourlyQuota = /额度|quota|429|限流/i.test(blkText) && !/物理送审|attempts\s*\d+\s*\/\s*\d+/i.test(blkText);
         if (p.stage && p.stage.status === 'blocked_on_user' && hourlyQuota) return { key: 'quota', label: '等额度', cls: 'warn' };
-        if (p.lastError) return { key: 'error', label: '出错', cls: 'error' };
-        if (p.stage && p.stage.status === 'blocked_on_user') return { key: 'human', label: '等待人工', cls: 'human' };
+        // blocked_on_user 是「等人工」，优先级高于 lastError：
+        // 旧版本会把预检原因写进 lastError，导致明明等人工却显示「出错」。
+        if (p.stage && p.stage.status === 'blocked_on_user') return { key: 'human', label: '需人工', cls: 'human' };
         if (humanHot.has(p.name)) return { key: 'human', label: '需人工', cls: 'human' };
+        const waitError = /等待人工处理|预检|今日已达上限|在途审稿|租约|等待 Kimi/.test(String(p.lastError || ''));
+        if (p.lastError && !waitError) return { key: 'error', label: '出错', cls: 'error' };
         if (p.stopping) return { key: 'stopping', label: '停止中', cls: 'stopping' };
         if (p.running) return { key: 'run', label: '正在运行', cls: 'run' };
         if (p.nextAtBasis === 'quota') return { key: 'quota', label: '等额度', cls: 'warn' };
@@ -2182,7 +2185,7 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
             p.stage && p.stage.status === 'paused'
               ? h(Btn, { key: 'resume', label: '解除暂停', primary: true, disabled: busy, onClick: () => act('resume', { root: p.root }) })
               : null,
-            h(Btn, { key: 'run', label: p.running ? '运行中…' : '运行一次', primary: true, disabled: busy || p.running, onClick: () => act('run', { root: p.root }) }),
+            h(Btn, { key: 'run', label: p.running ? '运行中…' : '运行一次', primary: true, disabled: busy || p.running || kindOf(p) === 'human', title: kindOf(p) === 'human' ? '当前需人工裁决，先在审核页提交答复' : '', onClick: () => act('run', { root: p.root }) }),
             p.stopping
               ? h(Btn, { key: 'unstop', label: '取消停止', title: '撤回停止意图：本轮继续跑完，之后照常起下一轮', disabled: busy, onClick: () => act('start', { root: p.root }) })
               : null,
@@ -2377,7 +2380,7 @@ body[data-ds-dark-theme] .daris.daris2 .daris-btn.primary{
                 p.running
                   ? h(Btn, { label: '停止', disabled: busy, onClick: () => act('stop', { root: p.root }) })
                   : p.enabled
-                    ? h(Btn, { label: '运行一次', primary: true, disabled: busy, onClick: () => act('run', { root: p.root }) })
+                    ? h(Btn, { label: '运行一次', primary: true, disabled: busy || kindOf(p) === 'human', title: kindOf(p) === 'human' ? '当前需人工裁决，先在审核页提交答复' : '', onClick: () => act('run', { root: p.root }) })
                     : h(Btn, {
                       label: armed === startKey(p) ? '确认启用' : '启用',
                       title: '启用后立即参与节拍：会起一轮、花额度、写产物；点两次确认',

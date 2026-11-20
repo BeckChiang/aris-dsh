@@ -100,8 +100,22 @@ export function appendLine(file, line) {
 }
 
 export function tailLines(file, count = 60) {
-  const text = readText(file);
-  if (text == null) return [];
+  let text;
+  try {
+    const stat = fs.statSync(file);
+    const size = Math.max(0, Number(stat.size) || 0);
+    const want = Math.min(size, Math.max(64 * 1024, count * 4096));
+    const buf = Buffer.alloc(want);
+    const fd = fs.openSync(file, 'r');
+    try {
+      fs.readSync(fd, buf, 0, want, Math.max(0, size - want));
+    } finally {
+      fs.closeSync(fd);
+    }
+    text = buf.toString('utf8');
+  } catch {
+    return [];
+  }
   return text.split(/\r?\n/).filter((l) => l.trim()).slice(-count);
 }
 
@@ -326,7 +340,23 @@ export function saveRuntime(root, patch) {
 }
 
 export function readCosts(root, limit = 300) {
-  const text = readText(costsFile(root));
+  const file = costsFile(root);
+  let text = '';
+  try {
+    const stat = fs.statSync(file);
+    const size = Math.max(0, Number(stat.size) || 0);
+    const want = Math.min(size, Math.max(256 * 1024, limit * 2048));
+    const buf = Buffer.alloc(want);
+    const fd = fs.openSync(file, 'r');
+    try {
+      fs.readSync(fd, buf, 0, want, Math.max(0, size - want));
+    } finally {
+      fs.closeSync(fd);
+    }
+    text = buf.toString('utf8');
+  } catch {
+    return [];
+  }
   if (!text) return [];
   const rows = [];
   for (const line of text.split(/\r?\n/)) {

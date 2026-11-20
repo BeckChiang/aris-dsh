@@ -407,13 +407,25 @@ export function modelInfo(slug) {
 
 export function readBudget(workspace) {
   const now = Date.now();
-  const raw = readJsonSafe(budgetFile(workspace), {}) || {};
+  const file = budgetFile(workspace);
+  let raw = {};
+  let corrupt = false;
+  try {
+    if (fs.existsSync(file)) {
+      raw = JSON.parse(fs.readFileSync(file, 'utf8')) || {};
+      if (!raw || typeof raw !== 'object') throw new Error('not an object');
+    }
+  } catch {
+    corrupt = true;
+    raw = {};
+  }
   const calls = (Array.isArray(raw.calls) ? raw.calls : [])
     .map((v) => Number(v))
     .filter((v) => Number.isFinite(v) && now - v < WINDOW_MS);
   const day = raw.day && typeof raw.day === 'object' ? raw.day : {};
   const today = new Date().toISOString().slice(0, 10);
   return {
+    corrupt,
     calls,
     day: { date: day.date === today ? today : today, count: day.date === today ? Number(day.count) || 0 : 0 },
     consecutiveFailures: Number(raw.consecutiveFailures) || 0,
@@ -455,6 +467,10 @@ export function quotaGate(workspace, cfg = readCodexConfig(workspace)) {
   const budget = readBudget(workspace);
   const used = budget.calls.length;
   const limit = Math.max(1, Number(cfg.hourlyLimit) || 1);
+  // 记录坏了就按「额度不可判定」拦住：否则会被当成 used=0 放行，白烧一次物理送审。
+  if (budget.corrupt) {
+    return { blocked: true, freeAt: null, minutes: null, reason: '额度记录（codex-budget.json）损坏，需人工确认', used, limit };
+  }
   if (budget.consecutiveFailures >= 3) {
     return { blocked: true, freeAt: null, minutes: null, reason: '连续 3 次失败，需人工恢复', used, limit };
   }

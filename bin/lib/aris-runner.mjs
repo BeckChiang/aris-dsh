@@ -839,6 +839,9 @@ export async function runOnce(options = {}) {
       capHit = markBlockedOnCap(root, cap);
       if (capHit) {
         appendEvent(workspace, { name, text: `${name}：审查封顶 ${cap.scope} ${cap.used}/${cap.cap} → blocked_on_user，等待人工（清单 ${capHit.human}）` });
+      } else {
+        // 写不进状态不等于没封顶：至少留一条可见记录，免得下一轮又去撞同一面墙。
+        appendEvent(workspace, { name, text: `${name}：审查封顶 ${cap.scope} ${cap.used}/${cap.cap}，但状态写入失败（state.json 读不到或坏了），请人工检查` });
       }
     }
   }
@@ -1253,7 +1256,9 @@ export async function tick(workspace, { force = false, hooks = null } = {}) {
       const wait = Number(gate.retryAfterMs) > 0 ? Number(gate.retryAfterMs) : 5 * 60_000;
       saveRuntime(entry.root, {
         status: 'idle',
-        lastError: gate.reason,
+        // 预检拦住多半是「等人工 / 等额度 / 在途审稿」，不是错误：
+        // 写进 lastError 会让面板显示「出错」，与实际状态打架。
+        lastError: null,
         blockedUntil: new Date(Date.now() + wait).toISOString(),
         nextAt: new Date(Date.now() + wait).toISOString(),
         waiting: pending.length,
