@@ -62,9 +62,10 @@ S7_submission 投稿（匿名稿、cover letter、预检）
 
 ### 2.3 一轮（wake / round）到底做了什么
 
-每轮子进程拿到的提示词是 7 步固定动作：
+每轮子进程拿到的提示词是「一段现状摘要 + 7 步固定动作」：
 
-1. 读 `state.json` + `pipeline/handoff/latest.md`
+0. 先读提示词里注入的**现状摘要**（状态 / 当前阶段 / 阻塞 / 哪些阶段还有未完成项 / 3 条待做示例），据此判断该不该动手
+1. 需要全局时读 `pipeline/PLAN-INDEX.json`（每阶段一行），再按需读 `state.json` 里相关阶段 + `pipeline/handoff/latest.md`
 2. 判断：paused / blocked / done → 直接退出（`RESULT: idle`）
 3. 用 `python pipeline/gate.py pipeline/state.json A` **认领 A 角色租约**（A/B 互斥，20 分钟冷却，70 分钟租约，每天 25 次唤醒上限）
 4. 只做一个**原子块**（一个可验证的小目标，不做半成品）
@@ -73,6 +74,16 @@ S7_submission 投稿（匿名稿、cover letter、预检）
 7. 收尾 `gate.py … A --finish`（若已送审加 `--async-wait`），末尾只打印一行 `RESULT: <done|idle|blocked> <一句话>`
 
 这一轮的产物：`runs/<runId>/`（事件流、日志、提示词、meta.json）、`costs.jsonl`（一条费用）、`runtime.json`（状态与下次时间）。
+
+#### 2.3.1 每轮上下文（精简后长什么样）
+
+以前提示词让执行者直接整份读 `state.json`（几百 KB、含整段验收文字），每轮都要付一遍 token。现在分三级：
+
+1. **现状摘要**（提示词内，6–8 行）：状态、当前阶段、阻塞 id 与理由、有未完成项的阶段及数量、3 条待做示例。由 `fillPrompt()` 用 `{{SNAPSHOT}}` 注入，来源是 `PLAN-INDEX.json`，过期就现算。
+2. **`pipeline/PLAN-INDEX.json`**（约 2 KB）：每阶段一行（状态 / 待做数 / 已完成数含归档 / 首个待做项），模型要看全局时读它。
+3. **`pipeline/state.json`**：仍然唯一事实源，但只在「真要改某个子项」时读对应阶段。
+
+`PLAN-INDEX.json` 由调度器在空闲窗口（等下一拍 / 预检拦停 / 一轮刚落）刷新，和 done 归档共用同一个维护钩子；内容没变就不重写。它是只读派生文件，不参与任何判定，删掉也会自动重建，**不影响流水线行为**。送审与审稿相关的提示词段落没有改动。
 
 ### 2.4 预算与额度
 

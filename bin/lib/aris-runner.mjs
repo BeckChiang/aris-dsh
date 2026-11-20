@@ -27,6 +27,7 @@ import { buildEnv, isPidAlive, killTree, resolveDsh, resolveNode, spawnHeadless,
 import { addUsage, normalizeUsage, priceUsage, rateFor, summarizeRuns, usageFromEvent, ZERO_USAGE } from './aris-cost.mjs?v=46';
 import { appendEvent } from './aris-events.mjs?v=46';
 import { maybeArchiveDone } from './aris-done-archive.mjs';
+import { buildPlanIndex, renderSnapshot, writePlanIndex } from './aris-plan-index.mjs';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 
@@ -176,13 +177,17 @@ function stamp(date = new Date()) {
   return `${date.getFullYear()}${p(date.getMonth() + 1)}${p(date.getDate())}T${p(date.getHours())}${p(date.getMinutes())}${p(date.getSeconds())}`;
 }
 
-/** 空闲窗口里顺手做一次 done 归档；失败一律静默，绝不拦调度。 */
-function autoArchive(workspace, entry) {
+/**
+ * 空闲窗口里的维护：done 归档 + 刷新计划索引。
+ * 两者都只读 state.json、只写各自的辅助文件，失败一律静默，绝不拦调度。
+ */
+function idleMaintenance(workspace, entry) {
   try {
     const text = (msg) => appendEvent(workspace, { name: entry.name || path.basename(entry.root), text: msg });
     maybeArchiveDone(entry.root, { workspace, name: entry.name, event: text });
+    writePlanIndex(entry.root, { driver: entry.driver || 'frrs' });
   } catch {
-    // 归档失败不影响流水线
+    // 维护失败不影响流水线
   }
 }
 
@@ -362,7 +367,9 @@ export function defaultPrompt(root, driver, config, settings, runId = '') {
       head,
       '',
       '你是 Frrs 论文二流水线执行者（DSH 侧，A 半区）。cwd 即根目录（勿再加 second/ 前缀），状态文件 `pipeline/state.json`。',
-      '1. 读状态文件 + pipeline/handoff/latest.md 最新节，别通读 PIPELINE.md。',
+      '现状（每轮自动注入，先看这段判断该不该动手）：',
+      '{{SNAPSHOT}}',
+      '1. 需要全局时读 `pipeline/PLAN-INDEX.json`（每阶段一行摘要），再按需读 `pipeline/state.json` 里相关阶段和 pipeline/handoff/latest.md 最新节；别通读 PIPELINE.md，也别每轮整份读 state.json。',
       '2. status 为 paused/blocked_on_user/done → 不改文件，打印 RESULT: blocked <原因>。',
       '3. 用 `python pipeline/gate.py pipeline/state.json A` 认领；非 PROCEED → RESULT: idle。冷却已为 0，别自判 20 分钟。',
       '4. 只做一个原子块（当前 todo 首个未完成项），小步、可自测。',
@@ -387,7 +394,9 @@ export function defaultPrompt(root, driver, config, settings, runId = '') {
     `状态文件：${stateRel}`,
     '',
     '步骤：',
-    '1. 读状态文件，确认当前阶段与门禁；需要时再按需读相关技能，不要整篇加载大技能。',
+    '现状（每轮自动注入，先看这段判断该不该动手）：',
+    '{{SNAPSHOT}}',
+    '1. 需要全局时读 `pipeline/PLAN-INDEX.json`（每阶段一行摘要），再按需读状态文件里相关阶段；技能按需读，不要整篇加载大技能。',
     '1.5 需要文献时只走 `node bin/lit.mjs lit "<topic>" --project .`（技能 `research-lit` 顶部横幅有约定），不要用 WebSearch 凭记忆写引用；正文只引用 papers.json 里的条目。',
     '2. 只推进一个原子工作块，并给出可执行的验证方式。',
     '3. 把结果登记回状态文件（set-artifact / log），不要伪造门禁通过。',
@@ -396,7 +405,7 @@ export function defaultPrompt(root, driver, config, settings, runId = '') {
     '最后必须打印一行：RESULT: <done|idle|blocked> <一句话>。',
   ].join('\n');
 }
-export const PROMPT_VERSION = 10;
+export const PROMPT_VERSION = 11;
 
 function promptMetaFile(root) {
   return path.join(runDir(root), 'prompt.meta.json');
@@ -454,8 +463,25 @@ export function resetPrompt(root, driver, config, settings) {
 }
 
 /** 模板占位符只在这里替换：prompt.md 落盘保留占位符，邮箱/根目录变了下一轮自动跟上。 */
+/** 现状摘要：优先用现成的 PLAN-INDEX.json，过期或缺失时现算（只读，几十毫秒）。 */
+function snapshotFor(root) {
+  try {
+    const idxFile = path.join(root, 'pipeline', 'PLAN-INDEX.json');
+    const stFile = path.join(root, 'pipeline', 'state.json');
+    if (fs.existsSync(idxFile) && fs.existsSync(stFile)) {
+      const fresh = fs.statSync(idxFile).mtimeMs >= fs.statSync(stFile).mtimeMs;
+      if (fresh) return renderSnapshot(JSON.parse(fs.readFileSync(idxFile, 'utf8')));
+    }
+    if (fs.existsSync(stFile)) return renderSnapshot(buildPlanIndex(root, { driver: 'frrs' }));
+    const arisState = path.join(root, '.aris', 'state.json');
+    if (fs.existsSync(arisState)) return renderSnapshot(buildPlanIndex(root, { driver: 'aris' }));
+  } catch { /* 摘要失败就当没有 */ }
+  return '';
+}
+
 export function fillPrompt(text, root, settings = {}, runId = '') {
   return String(text || '')
+    .replaceAll('{{SNAPSHOT}}', snapshotFor(root))
     .replaceAll('{{ROOT}}', root)
     .replaceAll('{{MAILBOX}}', settings.mailbox || '')
     .replaceAll('{{INTERVAL}}', String(settings.kimi?.intervalMinutes || 30))
@@ -1246,7 +1272,7 @@ export async function tick(workspace, { force = false, hooks = null } = {}) {
       if (runtime.nextAt !== iso || runtime.waiting !== pending.length) {
         saveRuntime(entry.root, { nextAt: iso, waiting: pending.length });
       }
-      autoArchive(workspace, entry);
+      idleMaintenance(workspace, entry);
       continue;
     }
 
@@ -1277,7 +1303,7 @@ export async function tick(workspace, { force = false, hooks = null } = {}) {
         gateReason: gate.reason,
       });
       skipped.push({ root: entry.root, reason: gate.reason });
-      autoArchive(workspace, entry);
+      idleMaintenance(workspace, entry);
       continue;
     }
     running += 1;
@@ -1289,8 +1315,8 @@ export async function tick(workspace, { force = false, hooks = null } = {}) {
         saveRuntime(entry.root, { status: 'error', lastError: String(error), pid: null });
       })
       .finally(() => {
-        // 一轮刚落、下一次节拍还没到时是最安全的归档窗口。
-        autoArchive(workspace, entry);
+        // 一轮刚落、下一次节拍还没到时是最安全的维护窗口。
+        idleMaintenance(workspace, entry);
         if (hooks && typeof hooks.onEnd === 'function') {
           try {
             hooks.onEnd({ root: entry.root });
