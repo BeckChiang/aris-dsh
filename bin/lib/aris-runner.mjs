@@ -1341,7 +1341,10 @@ export function reclaimStaleLease(root, config = {}) {
 /** 汇总某条流水线的成本俯视图。 */
 export function costView(root, limit = 200) {
   const file = costsFile(root);
-  const text = readText(file) || '';
+  // 成本流水只增不减，必须整份读：readText 会截到 400 KB（保留最早的记录），
+  // 结果是「累计轮数/累计花费」比实际少，今日成本却对得上，两个数还会互相矛盾。
+  let text = '';
+  try { text = fs.readFileSync(file, 'utf8'); } catch { text = ''; }
   const stampKey = `${file}|${text.length}|${text.slice(-40)}`;
   if (costCache.key === stampKey && costCache.value) return costCache.value;
   const runs = [];
