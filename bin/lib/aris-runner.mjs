@@ -26,6 +26,7 @@ import {
 import { buildEnv, isPidAlive, killTree, resolveDsh, resolveNode, spawnHeadless, writeModelPatch } from './aris-dsh.mjs?v=46';
 import { addUsage, normalizeUsage, priceUsage, rateFor, summarizeRuns, usageFromEvent, ZERO_USAGE } from './aris-cost.mjs?v=46';
 import { appendEvent } from './aris-events.mjs?v=46';
+import { maybeArchiveDone } from './aris-done-archive.mjs';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 
@@ -173,6 +174,16 @@ function handoffMode(workspace) {
 function stamp(date = new Date()) {
   const p = (n) => String(n).padStart(2, '0');
   return `${date.getFullYear()}${p(date.getMonth() + 1)}${p(date.getDate())}T${p(date.getHours())}${p(date.getMinutes())}${p(date.getSeconds())}`;
+}
+
+/** 空闲窗口里顺手做一次 done 归档；失败一律静默，绝不拦调度。 */
+function autoArchive(workspace, entry) {
+  try {
+    const text = (msg) => appendEvent(workspace, { name: entry.name || path.basename(entry.root), text: msg });
+    maybeArchiveDone(entry.root, { workspace, name: entry.name, event: text });
+  } catch {
+    // 归档失败不影响流水线
+  }
 }
 
 function lockFile(root) {
@@ -1235,6 +1246,7 @@ export async function tick(workspace, { force = false, hooks = null } = {}) {
       if (runtime.nextAt !== iso || runtime.waiting !== pending.length) {
         saveRuntime(entry.root, { nextAt: iso, waiting: pending.length });
       }
+      autoArchive(workspace, entry);
       continue;
     }
 
@@ -1265,6 +1277,7 @@ export async function tick(workspace, { force = false, hooks = null } = {}) {
         gateReason: gate.reason,
       });
       skipped.push({ root: entry.root, reason: gate.reason });
+      autoArchive(workspace, entry);
       continue;
     }
     running += 1;
@@ -1276,6 +1289,8 @@ export async function tick(workspace, { force = false, hooks = null } = {}) {
         saveRuntime(entry.root, { status: 'error', lastError: String(error), pid: null });
       })
       .finally(() => {
+        // 一轮刚落、下一次节拍还没到时是最安全的归档窗口。
+        autoArchive(workspace, entry);
         if (hooks && typeof hooks.onEnd === 'function') {
           try {
             hooks.onEnd({ root: entry.root });

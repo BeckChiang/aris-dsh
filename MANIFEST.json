@@ -1,11 +1,11 @@
 {
   "repo": "BeckChiang/aris-dsh",
-  "generated_at": "2026-11-20T02:23:14.424Z",
+  "generated_at": "2026-11-20T02:33:14.557Z",
   "note": "由 scripts/sync.mjs 从本机 DSH 工作区单向生成；本文件为发布快照标识，请勿手改。",
   "rules_version": 1,
   "counts": {
-    "files": 683,
-    "bytes": 13190703
+    "files": 684,
+    "bytes": 13195088
   },
   "excluded": [
     "tests",
@@ -3194,8 +3194,8 @@
     },
     {
       "p": "bin/aris-archive-done.mjs",
-      "sha256": "808e49233ca5aac9",
-      "bytes": 3743
+      "sha256": "2d7d463fe21549a4",
+      "bytes": 1908
     },
     {
       "p": "bin/aris-audit.mjs",
@@ -3263,6 +3263,11 @@
       "bytes": 5488
     },
     {
+      "p": "bin/lib/aris-done-archive.mjs",
+      "sha256": "d8b721a2ced60000",
+      "bytes": 5062
+    },
+    {
       "p": "bin/lib/aris-dsh.mjs",
       "sha256": "080d45e5c359bcc3",
       "bytes": 7660
@@ -3284,8 +3289,8 @@
     },
     {
       "p": "bin/lib/aris-runner.mjs",
-      "sha256": "7f6cf42f86df3029",
-      "bytes": 62610
+      "sha256": "96032e52bf90be31",
+      "bytes": 63272
     },
     {
       "p": "bin/lib/aris-state.mjs",
@@ -3349,8 +3354,8 @@
     },
     {
       "p": "docs/ARIS-流水线与面板手册.md",
-      "sha256": "259a11db9b07e873",
-      "bytes": 73080
+      "sha256": "a9c680f493c7b84f",
+      "bytes": 73576
     },
     {
       "p": "LICENSE",

@@ -197,7 +197,13 @@ S7_submission 投稿（匿名稿、cover letter、预检）
 
 每块都是可折叠段，详情默认全展开；右栏整体 sticky，随页面滚动常驻。底部是「操作 · 按影响分级」（L0–L3，见 §3.2.4 与 §3.6）。
 
-> **done 归档**：`done` 只增不删，长期运行会把 `state.json` 撑到几百 KB（超过读取上限会让预检异常）。需要瘦身时跑 `node bin/aris-archive-done.mjs <root> --keep 10 --apply`：默认 dry-run，写前自动备份 `state.json.bak-<时间戳>`，把旧条目搬到 `pipeline/done-archive.json`，并在 `doneArchived` 记账——面板/wiki 的「已完成 k 项」按总数显示，明细只列最近 10 条。
+> **done 归档**：`done` 只增不删，长期运行会把 `state.json` 撑到几百 KB（超过读取上限会让预检异常）。
+>
+> **自动**：调度器在三种空闲窗口顺手归档——① 无事可做、等下一次节拍；② 预检拦停（等人工 / 等额度 / 在途审稿）；③ 一轮刚结束。条件是 `state.json` ≥ 380 KB 且距上次归档超过 6 小时；每阶段只留最近 10 条，写盘用临时文件 + 原子替换，备份留在 `.aris-run/state.json.bak-*`（最多 3 份），归档结果记进 `aris-events.jsonl`。归档失败只记日志，不拦调度。
+>
+> **手动**：`node bin/aris-archive-done.mjs <root> [--keep 10] --apply`（默认 dry-run）。
+>
+> 两种方式都只动 `states[].done`，绝不碰 `todo` / `status` / 门禁；面板与 wiki 的「已完成 k 项」按 `done.length + doneArchived` 统计，明细只列最近 10 条，更早在 `pipeline/done-archive.json`。
 
 旧五块写法（正在做什么 / 总计划·计划与事件 / 图表 / 运行数据 / 操作）自 2026-11-19 起作废。
 
